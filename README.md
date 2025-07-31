@@ -39,6 +39,12 @@ Question → 🛡️ Guardrails → 🧠 Planner → 🔄 Text2Cypher → 📝 S
 - **📝 Summarization**: Formats raw results into natural language responses
 - **✅ Final Answer**: Output formatting and conversation history management
 
+### Workflow Diagram
+
+![Detailed Workflow Diagram](docs/images/workflow_diagram_detailed.png)
+
+*The diagram above shows the complete LangGraph workflow with all components and decision points, including the detailed Text2Cypher pipeline with generation, validation, correction, and execution steps.*
+
 #### Key Data Flow Details:
 
 **🛡️ Guardrails**: Validates question scope using graph schema
