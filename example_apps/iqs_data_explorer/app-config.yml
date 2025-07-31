@@ -1,0 +1,165 @@
+# Neo4j connection settings (environment variables take precedence, then config values, then defaults)
+# Supports: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, NEO4J_DATABASE environment variables
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "password"
+  database: "honda"
+  enhanced_schema: true  # Enable enhanced schema features for Langchain schema retrieval
+
+# Language model configuration
+# API keys should be set as environment variables: OPENAI_API_KEY or AZURE_OPENAI_* vars
+llm:
+  provider: "openai"  # Options: "openai", "azure_openai"
+  model: "gpt-4o"     # Model name (for OpenAI) or deployment name (for Azure)
+  temperature: 0      # Response randomness (0.0-1.0)
+
+streamlit_ui:
+  title: "IQS Data Explorer"
+  scope_description: "This application may answer questions related to customer feedback on Honda vehicles."
+  example_questions:
+    - "How many vehicles are there?"
+    - "Visualize feedback paths from customers for acura make, list their categories and summarize the feedback about doors"
+    - "Summarize the responses under fcd10 for honda pilot. What is the men to women proportion for these responses and what is the problem for fcd10?"
+    - "What are the top 5 most severe problems for women aged 30-34 for all Acura models?"
+    - "Please summarize the verbatims for 2023 RDX for question 010 Trunk/TG Touch-Free Sensor DTU and create categories for the problems. As an output, I want the summary, corresponding categories and their verbatims"
+    - "What are the top 5 problems about seats for each age buckets for men over the age of 53?"
+    - "Summarize and compare the sentiment for responses related to noise and sound in Honda Accord and Honda Pilot for women and return the number of responses considered."
+    - "What color is the sky?"
+
+example_queries:
+  - question: What is the proportion of male to female complainants about cup holders in the Honda Odyssey?
+    cql: |-
+      MATCH (v:Verbatim {make: "Honda", model: "Odyssey"})
+        WHERE v.verbatimText CONTAINS "cup holder"
+      WITH SUM(COUNT {MATCH (v:Verbatim) WHERE v.gender = "Male" RETURN v}) AS males,
+           SUM(COUNT {MATCH (v:Verbatim) WHERE v.gender = "Female" RETURN v}) AS females
+      RETURN males, females, toFloat(males) / (CASE WHEN females = 0 THEN 1 ELSE females END)  AS maleToFemale
+  - question: What is the proportion of male to female complainants per categories in the Acura RDX?
+    cql: |-
+      MATCH (c:Category)<-[:HAS_CATEGORY]-(v:Verbatim {make: "Acura", model: "RDX"})
+      WITH c.id AS category,
+           SUM(COUNT {MATCH (v:Verbatim) WHERE v.gender = "Male" RETURN v}) AS males,
+           SUM(COUNT {MATCH (v:Verbatim) WHERE v.gender = "Female" RETURN v}) AS females
+      RETURN category, males, females, toFloat(males) / (CASE WHEN females = 0 THEN 1 ELSE females END) AS maleToFemale
+      ORDER BY category
+  - question: Summarize the top 3 most common complaints about Apple CarPlay on the Honda Pilot.
+    cql: |-
+      MATCH (v:Verbatim {make: "Honda", model: "Pilot"})
+        WHERE v.verbatimText CONTAINS "carplay"
+      RETURN v.verbatim as content
+  - question: What are the top 10 problems with males between the ages of 40 and 70 years old and what vehicles were involved?
+    cql: |-
+      MATCH (p:Problem)<-[:HAS_PROBLEM]-(v:Verbatim)
+        WHERE v.minAge >= 40 AND v.maxAge <= 70 AND v.gender = "Male"
+      WITH p, COUNT(v) AS total, COLLECT(DISTINCT v.make + " " + v.model) AS vehicles
+      ORDER BY total DESC
+      LIMIT 5
+      RETURN p.problem AS problem, total, vehicles
+  - question: What are the top 10 problems that share the most responses between a Honda Odyssey and Honda Civic?
+    cql: |-
+      MATCH (p:Problem)<-[:HAS_PROBLEM]-(v:Verbatim {make: "Honda", model: "Odyssey"})
+      WITH p, count(v) AS total1
+      MATCH (p)<-[:HAS_PROBLEM]-(v:Verbatim {make: "Honda", model: "Civic"})
+      WITH p.problem AS problem, total1, count(v) AS total2
+      RETURN problem, total1 + total2 AS totalResponses
+      ORDER BY totalResponses DESC
+      LIMIT 10
+  - question: What are the total responses under seat23 for honda civic, what is the male to female proportion for these responses and what is the problem for seat23?
+    cql: |-
+      MATCH (p:Problem {id: "SEAT23"})<-[:HAS_PROBLEM]-(v:Verbatim {make: "Honda", model: "Civic"})
+      WITH p.problem AS problem, COUNT(v) AS totalResponses,
+      SUM(CASE WHEN v.gender = "Male" THEN 1 ELSE 0 END) AS males,
+      SUM(CASE WHEN v.gender = "Female" THEN 1 ELSE 0 END) AS females
+      RETURN totalResponses, males, females, toFloat(males) /  (CASE WHEN females = 0 THEN 1 ELSE females END) AS maleToFemaleRatio, problem
+  - question: Compare the sentiment for verbatims related to parking cameras in Acura MDX and Acura RDX.
+    cql: |-
+      MATCH (v:Verbatim)
+        WHERE v.verbatimText CONTAINS 'acura mdx' AND v.verbatimText CONTAINS 'parking cameras'
+      RETURN v.model AS model, v.verbatim as content LIMIT 50
+      UNION
+      MATCH (v:Verbatim)
+        WHERE v.verbatimText CONTAINS 'acura rdx' AND v.verbatimText CONTAINS 'parking cameras'
+      RETURN v.model AS model, v.verbatim as content LIMIT 50
+  - question: What are the sentiments towards Honda doors?
+    cql: |-
+      MATCH (v:Verbatim)
+        WHERE v.verbatimText CONTAINS 'honda' AND v.verbatimText CONTAINS 'door'
+      RETURN v.model AS model, v.verbatim as content
+  - question: For customers who complained about problem DRE10, what other problems are indicated from the same customers? What are top 2 common problems between customers?
+    cql: |-
+      MATCH (p:Problem {id: 'DRE10'})<-[:HAS_PROBLEM]-(v:Verbatim)<-[:SUBMITTED]-(c:Customer)
+        WHERE v.verbatim <> ''
+      WITH c, p
+      MATCH (c)-[:SUBMITTED]->(v2:Verbatim)-[:HAS_PROBLEM]->(p2:Problem)
+        WHERE p <> p2 AND v2.verbatim <> ''
+      WITH p.problem AS problem, p2.problem AS similarProblem, COLLECT(v2.verbatim) AS content
+      RETURN problem, similarProblem, content, SIZE(content) AS sharedTotal
+      ORDER BY sharedTotal DESC LIMIT 2;
+  - question: For the infotainment category, what are top 3 models with the highest severity score?
+    cql: |-
+      MATCH (v:Verbatim)
+        WHERE v.verbatimText CONTAINS 'infotainment' AND v.severity IS NOT NULL
+      RETURN DISTINCT v.model AS model, count(v) AS totalResponses, avg(v.severity) AS score
+      ORDER BY score DESC
+      LIMIT 10;
+  - question: What are the top 3 infotainment problems for each age buckets?
+    cql: |-
+      MATCH (v:Verbatim)-[:HAS_PROBLEM]->(p:Problem)
+        WHERE v.verbatimText CONTAINS 'infotainment' AND v.ageBucket IS NOT NULL
+      WITH v.ageBucket AS ageBucket, p.problem AS problem, collect(v.verbatim) AS responses
+      WITH ageBucket, problem, size(responses) AS total, responses
+      WITH * ORDER BY ageBucket, total DESC
+      WITH ageBucket, COLLECT(problem) AS problems, COLLECT(total) AS totals, COLLECT(responses) AS responsesList
+      RETURN ageBucket, problems[..3] AS problem, totals[..3] AS total, responsesList[..3] AS reponses
+      LIMIT 3
+  - question: What are the 3 most reported problems for Honda vehicles by model year and what are the 3 most reported problems for Acura vehicles by model year?
+    cql: |-
+      MATCH (v:Verbatim{make: 'Honda'})-[:HAS_PROBLEM]->(p:Problem)
+      WITH v.make AS make, p.problem AS problem, COUNT(v) AS total ORDER BY total DESC LIMIT 3
+      RETURN make, problem, total
+      UNION
+      MATCH (v:Verbatim{make: 'Acura'})-[:HAS_PROBLEM]->(p:Problem)
+      WITH v.make AS make, p.problem AS problem, COUNT(v) AS total ORDER BY total DESC LIMIT 3
+      RETURN make, problem, total;
+  - question: What are the top 5 most severe questions for females aged 30-34 for all Acura models?
+    cql: |-
+      MATCH (q:Question)<-[:HAS_QUESTION]-(v:Verbatim)
+      WHERE v.gender = "Female" AND v.make = "Acura" AND v.minAge >= 30 AND v.maxAge <= 34 AND v.severity IS NOT NULL
+      WITH q, avg(v.severity) as avgSeverity
+      RETURN q.question AS question, avgSeverity
+      ORDER BY avgSeverity DESC
+      LIMIT 5
+  - question: What are the top 5 most severe problems for females aged 30-34 for all Acura models?
+    cql: |-
+      MATCH (p:Problem)<-[:HAS_PROBLEM]-(v:Verbatim)
+      WHERE v.gender = "Female" AND v.make = "Acura" AND v.minAge >= 30 AND v.maxAge <= 34 AND v.severity IS NOT NULL
+      WITH p, avg(v.severity) as avgSeverity
+      RETURN p.problem AS problem, avgSeverity
+      ORDER BY avgSeverity DESC
+      LIMIT 5
+  - question: How similar or different are the verbatims for males and females aged 30-34 for all Acura models?
+    cql: |-
+      MATCH (v:Verbatim)
+      WHERE v.gender = "Male" AND v.make = "Acura" AND v.minAge >= 30 AND v.maxAge <= 34 AND isEmpty(v.verbatim) = false
+      WITH collect(v.verbatim) as content
+      RETURN "Male" as gender, content LIMIT 50
+      UNION
+      MATCH (v:Verbatim)
+      WHERE v.gender = "Female" AND v.make = "Acura" AND v.minAge >= 30 AND v.maxAge <= 34 AND isEmpty(v.verbatim) = false
+      WITH collect(v.verbatim) as content
+      RETURN "Female" as gender, content LIMIT 50
+  - question: Please summarize the verbatims for 2023 RDX for question 010 Trunk/TG Touch-Free Sensor DTU and create 5 categories for the problems. As an output, I want a list of verbatims and the corresponding categories
+    cql: |-
+      MATCH (q:Question{id: 10})<-[:HAS_QUESTION]-(v:Verbatim)
+        WHERE v.model='RDX'
+      RETURN v.verbatim
+  - question: Visualize feedback paths from customers for acura make, list their categories and summarize the feedback about doors
+    cql: |-
+      MATCH path=(v:Verbatim)-[:HAS_CATEGORY]->(c:Category)<-[:HAS_CATEGORY]-(p:Problem)<-[:HAS_PROBLEM]-(q:Question)
+        WHERE v.make = 'Acura' AND q.question CONTAINS 'Doors'
+      RETURN path
+  - question: Show me the category, problem and question hierarchy
+    cql: |-
+      MATCH path=(c:Category)<-[r1:HAS_CATEGORY]-(p:Problem)<-[r2:HAS_PROBLEM]-(q:Question)
+      RETURN c, p, q

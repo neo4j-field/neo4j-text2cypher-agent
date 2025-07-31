@@ -1,0 +1,352 @@
+from typing import Any, Dict, List
+
+import pandas as pd
+import streamlit as st
+from langgraph.errors import GraphRecursionError
+from neo4j.exceptions import SessionExpired
+
+from neo4j_text2cypher.components.state import (
+    CypherHistoryRecord,
+    HistoryRecord,
+    OutputState,
+)
+from neo4j_text2cypher.ui.components.visualization import (
+    render_neo4j_graph_from_result
+)
+
+
+def convert_records_to_dataframe(records: List[Dict[str, Any]]) -> pd.DataFrame:
+    """
+    Convert list of records to a pandas DataFrame for better display.
+    Handles complex data types including Neo4j paths by converting them to readable representations.
+    
+    Parameters
+    ----------
+    records : List[Dict[str, Any]]
+        The records from Cypher query results
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame for interactive display
+    """
+    if not records:
+        return pd.DataFrame()
+    
+    try:
+        # Convert complex objects to string representations for DataFrame compatibility
+        cleaned_records = []
+        for record in records:
+            cleaned_record = {}
+            for key, value in record.items():
+                cleaned_record[key] = _convert_value_for_dataframe(value)
+            cleaned_records.append(cleaned_record)
+        
+        return pd.DataFrame(cleaned_records)
+        
+    except Exception:
+        # Any error - just return empty DataFrame 
+        return pd.DataFrame()
+
+
+def _convert_value_for_dataframe(value: Any) -> str:
+    """
+    Convert a value to a DataFrame-friendly representation.
+    
+    Parameters
+    ----------
+    value : Any
+        The value to convert
+        
+    Returns
+    -------
+    str
+        String representation suitable for DataFrame display
+    """
+    if value is None:
+        return ""
+    elif isinstance(value, (str, int, float, bool)):
+        return value
+    elif isinstance(value, list):
+        return _convert_path_or_list(value)
+    elif isinstance(value, dict):
+        # Handle node/relationship objects - show key properties
+        return _convert_node_or_relationship(value)
+    else:
+        return str(value)
+
+
+def _convert_path_or_list(path_list: list) -> str:
+    """Convert list to readable string, keeping raw data for download purposes."""
+    if not path_list:
+        return ""
+    
+    # Simple list handling - just convert to string representation
+    if len(path_list) <= 5 and all(isinstance(item, (str, int, float)) for item in path_list):
+        # Simple list with few items - comma separated
+        return ", ".join(str(item) for item in path_list)
+    else:
+        # Complex or long list - keep as string representation for raw data access
+        return str(path_list)
+
+
+def _display_cypher_results(cypher: Dict[str, Any]) -> None:
+    """
+    Display results for a single cypher query (visualization and/or DataFrame).
+    
+    Parameters
+    ----------
+    cypher : Dict[str, Any]
+        The cypher record containing statement, records, result, etc.
+    """
+    # Check if we have visualization data first
+    result_obj = cypher.get("result")
+    records = cypher.get("records")
+    has_visualization = False
+    
+    if result_obj and records:
+        try:
+            # Check if Result has nodes to visualize
+            graph_data = result_obj.graph()
+            nodes_count = len(graph_data.nodes) if hasattr(graph_data, 'nodes') else 0
+            
+            if nodes_count > 0:
+                has_visualization = True
+                render_neo4j_graph_from_result(result_obj, height=600)
+        except Exception as e:
+            st.error(f"Error displaying graph visualization: {str(e)}")
+    
+    # Only show DataFrame if no visualization and not pure node query
+    if not has_visualization and records and not _has_only_node_objects(records):
+        df = convert_records_to_dataframe(records)
+        if not df.empty:
+            st.subheader("Results")
+            st.dataframe(df, use_container_width=True)
+        else:
+            # Fallback: show raw data when DataFrame conversion fails
+            st.subheader("Results")
+            st.json(records[:10])  # Show first 10 records as JSON
+            if len(records) > 10:
+                st.caption(f"Showing first 10 of {len(records)} records")
+
+
+def _has_only_node_objects(records: List[Dict[str, Any]]) -> bool:
+    """
+    Check if records contain ONLY node/relationship objects (no other data types).
+    
+    Parameters
+    ----------
+    records : List[Dict[str, Any]]
+        The records to check
+        
+    Returns
+    -------
+    bool
+        True if records contain only node/relationship objects
+    """
+    if not records:
+        return False
+    
+    # Check first few records for performance
+    for record in records[:3]:
+        for value in record.values():
+            if not isinstance(value, dict):
+                return False  # Found non-node data, so not "only nodes"
+    return True  # All values are dicts (nodes/relationships)
+
+
+def _convert_node_or_relationship(obj: dict) -> str:
+    """Convert a Neo4j node or relationship to a simple label representation."""
+    if not obj:
+        return "Node"
+    
+    # Just show it's a node/object - users can see details in visualization
+    return "Node"
+
+
+def convert_streamlit_messages_to_history() -> List[HistoryRecord]:
+    """
+    Convert Streamlit session messages to HistoryRecord format.
+
+    Returns
+    -------
+    List[HistoryRecord]
+        List of conversation history records.
+    """
+    messages = st.session_state.get("messages", [])
+    history_records = []
+
+    # Process messages in pairs (user question + assistant response)
+    for i in range(0, len(messages) - 1, 2):
+        if i + 1 < len(messages):
+            user_msg = messages[i]
+            assistant_msg = messages[i + 1]
+
+            # Ensure we have a user-assistant pair
+            if (
+                user_msg.get("role") == "user"
+                and assistant_msg.get("role") == "assistant"
+            ):
+                question = user_msg.get("content", "")
+                assistant_content = assistant_msg.get("content", {})
+
+                # Handle AddableValuesDict from LangGraph - convert to regular dict
+                if hasattr(assistant_content, "get") and not isinstance(
+                    assistant_content, (str, dict)
+                ):
+                    # Convert AddableValuesDict to regular dict
+                    assistant_content = dict(assistant_content)
+
+                # Handle case where assistant_content might be a string (error messages)
+                if isinstance(assistant_content, str):
+                    answer = assistant_content
+                    cyphers = []
+                else:
+                    answer = assistant_content.get("answer", "")
+                    cypher_states = assistant_content.get("cyphers", [])
+
+                    # Convert cypher states to CypherHistoryRecord format
+                    cyphers = []
+                    for cypher_state in cypher_states:
+                        cypher_record = CypherHistoryRecord(
+                            task=cypher_state.get("task", ""),
+                            statement=cypher_state.get("statement", ""),
+                            records=cypher_state.get("records", []),
+                        )
+                        cyphers.append(cypher_record)
+
+                history_record = HistoryRecord(
+                    question=question, answer=answer, cyphers=cyphers
+                )
+                history_records.append(history_record)
+
+    return history_records
+
+
+def append_user_question(question: str) -> None:
+    st.session_state.get("messages", []).append({"role": "user", "content": question})
+    st.chat_message("user").markdown(question)
+
+
+async def append_llm_response(question: str) -> None:
+    with st.chat_message("assistant"):
+        # Create a container that will completely replace its content
+        response_container = st.container()
+        
+        # Show only thinking status initially
+        with response_container:
+            thinking_placeholder = st.empty()
+            with thinking_placeholder:
+                st.status("thinking...")
+        
+        
+        agent = st.session_state.get("agent")
+
+        if agent is not None:
+            try:
+                # Convert Streamlit messages to HistoryRecord format
+                history = convert_streamlit_messages_to_history()
+
+                response: OutputState = await agent.ainvoke(
+                    {"question": question, "data": [], "history": history},
+                    config={"recursion_limit": 30},
+                )
+
+                # Clear thinking status and show response
+                thinking_placeholder.empty()
+                with response_container:
+                    with st.expander("Response", expanded=True):
+                        # Show the answer text
+                        st.markdown(response.get("answer", ""))
+                        
+                        # Show response details if there are cyphers
+                        show_cypher_response_information(response=response, is_latest_response=True)
+
+                st.session_state.get("messages", []).append(
+                    {"role": "assistant", "content": response}
+                )
+            except GraphRecursionError:
+                error_msg = "Query exceeded processing limits. Please try a simpler question or break it into smaller parts."
+                thinking_placeholder.empty()
+                with response_container:
+                    st.error(error_msg)
+                st.session_state.get("messages", []).append(
+                    {"role": "assistant", "content": {"answer": error_msg}}
+                )
+            except Exception as e:
+                error_msg = f"Unexpected error occurred: {str(e)}"
+                thinking_placeholder.empty()
+                with response_container:
+                    st.error(error_msg)
+                st.session_state.get("messages", []).append(
+                    {"role": "assistant", "content": {"answer": error_msg}}
+                )
+        else:
+            error_msg = "Agent not available. Please refresh the page."
+            thinking_placeholder.empty()
+            with response_container:
+                st.error(error_msg)
+            st.session_state.get("messages", []).append(
+                {"role": "assistant", "content": {"answer": error_msg}}
+            )
+
+
+
+def show_cypher_response_information(response: OutputState, is_latest_response: bool = False) -> None:
+    if response.get("cyphers") and len(response.get("cyphers", list())) > 0:
+        # Simple header for response details
+        header_text = "📊 Response Details"
+        
+        # Create a collapsible expander for the entire response
+        with st.expander(header_text, expanded=is_latest_response):
+            cyphers = response.get("cyphers", list())
+            
+            if len(cyphers) > 1:
+                # Show query headers only for multiple queries
+                for i, cypher in enumerate(cyphers):
+                    st.markdown(f"### {i+1}. {cypher.get('task', '')}")
+                    
+                    with st.expander("Generated Cypher / Results"):
+                        st.code(cypher.get("statement"), language="cypher")
+                        if cypher.get("parameters"):
+                            st.write("Parameters:", cypher.get("parameters"))
+                        
+                        # Display results using common function
+                        _display_cypher_results(cypher)
+            else:
+                # Single query - simpler display with auto-expanded inner section
+                cypher = cyphers[0]
+                with st.expander("Generated Cypher / Results", expanded=True):
+                    st.write(cypher.get("task", ""))
+                    st.code(cypher.get("statement"), language="cypher")
+                    if cypher.get("parameters"):
+                        st.write("Parameters:", cypher.get("parameters"))
+                    
+                    # Display results using common function
+                    _display_cypher_results(cypher)
+
+
+async def chat(question: str) -> None:
+    try:
+        append_user_question(question=question)
+        await append_llm_response(question=question)
+    except SessionExpired as e:
+        st.error(f"Neo4j Session expired. Please restart the application. Error: {e}")
+
+
+def display_chat_history() -> None:
+    for message in st.session_state.get("messages", []):
+        with st.chat_message(message["role"]):
+            if message.get("role") == "user":
+                st.markdown(message.get("content"))
+            else:
+                # Create main chatbot response section for chat history
+                response_content = message["content"]
+                with st.expander("Response", expanded=True):
+                    # Show the answer text
+                    st.markdown(response_content.get("answer", ""))
+                    
+                    # Show response details if there are cyphers
+                    show_cypher_response_information(response=response_content)
+
+
