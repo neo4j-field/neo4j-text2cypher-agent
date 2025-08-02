@@ -112,7 +112,39 @@ def _display_cypher_results(cypher: Dict[str, Any]) -> None:
             
             if nodes_count > 0:
                 has_visualization = True
-                render_neo4j_graph_from_result(result_obj, height=600)
+                
+                # Create columns for visualization and legend
+                viz_col, legend_col = st.columns([3, 1])
+                
+                with viz_col:
+                    node_labels, rel_types, color_mapping = render_neo4j_graph_from_result(result_obj, height=600)
+                
+                with legend_col:
+                    if node_labels or rel_types:
+                        st.markdown("### Results Overview")
+                        
+                        if node_labels:
+                            total_nodes = sum(node_labels.values())
+                            st.markdown(f"#### **Nodes ({total_nodes})**")
+                            for label, count in sorted(node_labels.items()):
+                                if color_mapping and label in color_mapping:
+                                    color = color_mapping[label]
+                                    st.markdown(
+                                        f'<span style="background-color: {color}; color: black; padding: 2px 6px; border-radius: 12px; font-weight: bold;">{label} ({count})</span>',
+                                        unsafe_allow_html=True
+                                    )
+                                else:
+                                    st.markdown(f"**{label} ({count})**")
+                            st.write("")  # Add space
+                        
+                        if rel_types:
+                            total_relationships = sum(rel_types.values())
+                            st.markdown(f"#### **Relationships ({total_relationships})**")
+                            for rel_type, count in sorted(rel_types.items()):
+                                st.markdown(
+                                    f'<span style="background-color: #E0E0E0; color: black; padding: 2px 6px; border-radius: 12px; font-weight: bold;">{rel_type} ({count})</span>',
+                                    unsafe_allow_html=True
+                                )
         except Exception as e:
             st.error(f"Error displaying graph visualization: {str(e)}")
     

@@ -30,7 +30,7 @@ def create_text2cypher_generation_prompt_template() -> ChatPromptTemplate:
                     """You are a Neo4j expert. Given an input question, create a syntactically correct Cypher query to run.
 Do not wrap the response in any backticks or anything else. Begin with MATCH or WITH clauses only. Respond with a Cypher statement only!
 
-IMPORTANT: Always end your query with LIMIT 100 unless the question specifically asks for all results or a different number.
+IMPORTANT: Always end your query with LIMIT 50 unless the question specifically asks for all results or a different number.
 
 Here is the schema information
 {schema}

@@ -85,7 +85,7 @@ def sidebar() -> None:
         st.sidebar.divider()
 
     # 2. Query Processing Settings (controls that change behavior)
-    st.sidebar.subheader("🔧 Query Processing Settings")
+    st.sidebar.markdown("### 🔧 Query Processing Settings")
     
     # Get current settings
     current_break_into_subquestions = st.session_state.get("break_into_subquestions", True)
@@ -99,12 +99,14 @@ def sidebar() -> None:
         help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is."
     )
     
-    # Cypher Retriever Strategy with emoji
+    # Cypher Retriever Strategy with consistent header
+    st.sidebar.markdown("### 🔍 Cypher Retriever Strategy")
     similarity_type = st.sidebar.radio(
-        "🔍 Cypher Retriever Strategy",
+        "Select retriever strategy",  # Non-empty label for accessibility
         options=["Static", "Semantic Similarity"],
         index=0 if current_similarity_type == "Static" else 1,
-        help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity."
+        help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
+        label_visibility="collapsed"
     )
     
     # K Value slider (only show when semantic similarity is selected)
