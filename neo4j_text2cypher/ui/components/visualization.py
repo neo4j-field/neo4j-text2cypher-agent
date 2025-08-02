@@ -32,7 +32,9 @@ def render_neo4j_graph_from_result(
     height: int = 600,
     node_color_property: str = "labels",
     node_size_property: Optional[str] = None,
-    row_limit: int = 50
+    row_limit: int = 50,
+    layout: str = "force-directed",
+    direction: Optional[str] = None
 ) -> Tuple[Optional[Dict[str, int]], Optional[Dict[str, int]], Optional[Dict[str, str]]]:
     """
     Render Neo4j Result.graph as an interactive visualization.
@@ -49,6 +51,10 @@ def render_neo4j_graph_from_result(
         Property to use for node sizing, by default None
     row_limit : int, optional
         Maximum number of rows to include in visualization, by default 50
+    layout : str, optional
+        Layout algorithm to use: "force-directed" or "hierarchical", by default "force-directed"
+    direction : Optional[str], optional
+        Direction for hierarchical layout: "down", "up", "left", "right", by default None
         
     Returns
     -------
@@ -120,8 +126,27 @@ def render_neo4j_graph_from_result(
             # If we can't extract legend data, continue without it
             pass
         
-        # Render the visualization
-        html_content = viz.render()._repr_html_()
+        # Render the visualization with layout configuration
+        if layout == "hierarchical":
+            from neo4j_viz import Layout, HierarchicalLayoutOptions, Direction
+            
+            # Configure hierarchical layout options if direction is specified
+            if direction:
+                direction_map = {
+                    "down": Direction.DOWN,
+                    "up": Direction.UP, 
+                    "left": Direction.LEFT,
+                    "right": Direction.RIGHT
+                }
+                layout_options = HierarchicalLayoutOptions(
+                    direction=direction_map.get(direction, Direction.DOWN)
+                )
+                html_content = viz.render(layout=Layout.HIERARCHICAL, layout_options=layout_options)._repr_html_()
+            else:
+                html_content = viz.render(layout=Layout.HIERARCHICAL)._repr_html_()
+        else:
+            # Default force-directed layout
+            html_content = viz.render()._repr_html_()
         
         # Add CSS to hide scrollbars and ensure proper fit
         styled_content = f"""

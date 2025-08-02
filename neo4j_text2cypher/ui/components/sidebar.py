@@ -107,11 +107,10 @@ def sidebar() -> None:
         # Cypher Retriever Strategy with consistent header
         st.markdown("#### 🔍 Cypher Retriever Strategy")
         similarity_type = st.radio(
-            "Select retriever strategy",  # Non-empty label for accessibility
+            "Select retriever strategy",
             options=["Static", "Semantic Similarity"],
             index=0 if current_similarity_type == "Static" else 1,
-            help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
-            label_visibility="collapsed"
+            help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity."
         )
         
         # K Value slider (only show when semantic similarity is selected)
