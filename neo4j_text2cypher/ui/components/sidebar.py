@@ -47,9 +47,8 @@ def _recreate_workflow_with_new_settings(break_into_subquestions: bool, similari
         # Update workflow components with new retriever
         st.session_state.workflow_components["cypher_example_retriever"] = retriever
         
-        # Clear any pending question to prevent re-running
-        if "current_question" in st.session_state:
-            del st.session_state["current_question"]
+        # Prevent question re-submission after settings change
+        st.session_state["submit_new_question"] = False
         
         # Show user that settings were updated with better formatting
         planner_status = "enabled" if break_into_subquestions else "disabled"
@@ -81,6 +80,7 @@ def sidebar() -> None:
                 display_text, key=f"sidebar_example_{i}", help=question
             ):
                 st.session_state["current_question"] = question
+                st.session_state["submit_new_question"] = True
 
         st.sidebar.divider()
 
@@ -92,34 +92,42 @@ def sidebar() -> None:
     current_similarity_type = st.session_state.get("similarity_type", "Static")
     current_k_value = st.session_state.get("k_value", 5)
     
-    # Planner Toggle
-    break_into_subquestions = st.sidebar.checkbox(
-        "Break questions into subquestions", 
-        value=current_break_into_subquestions,
-        help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is."
-    )
-    
-    # Cypher Retriever Strategy with consistent header
-    st.sidebar.markdown("### 🔍 Cypher Retriever Strategy")
-    similarity_type = st.sidebar.radio(
-        "Select retriever strategy",  # Non-empty label for accessibility
-        options=["Static", "Semantic Similarity"],
-        index=0 if current_similarity_type == "Static" else 1,
-        help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
-        label_visibility="collapsed"
-    )
-    
-    # K Value slider (only show when semantic similarity is selected)
-    if similarity_type == "Semantic Similarity":
-        k_value = st.sidebar.slider(
-            "Number of examples",
-            min_value=1,
-            max_value=20,
-            value=10 if current_k_value == 5 else current_k_value,
-            help="Number of most similar examples to retrieve for query generation"
+    # Create an indented container for the settings
+    with st.sidebar.container():
+        # Add some left padding/indentation
+        st.markdown("""<div style="padding-left: 20px;">""", unsafe_allow_html=True)
+        
+        # Planner Toggle
+        break_into_subquestions = st.checkbox(
+            "Break questions into subquestions", 
+            value=current_break_into_subquestions,
+            help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is."
         )
-    else:
-        k_value = current_k_value  # Keep current value when not using semantic similarity
+        
+        # Cypher Retriever Strategy with consistent header
+        st.markdown("#### 🔍 Cypher Retriever Strategy")
+        similarity_type = st.radio(
+            "Select retriever strategy",  # Non-empty label for accessibility
+            options=["Static", "Semantic Similarity"],
+            index=0 if current_similarity_type == "Static" else 1,
+            help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
+            label_visibility="collapsed"
+        )
+        
+        # K Value slider (only show when semantic similarity is selected)
+        if similarity_type == "Semantic Similarity":
+            k_value = st.slider(
+                "Number of examples",
+                min_value=1,
+                max_value=20,
+                value=10 if current_k_value == 5 else current_k_value,
+                help="Number of most similar examples to retrieve for query generation"
+            )
+        else:
+            k_value = current_k_value  # Keep current value when not using semantic similarity
+        
+        # Close the indented div
+        st.markdown("""</div>""", unsafe_allow_html=True)
     
     # If any setting changed, recreate workflow
     settings_changed = (
@@ -185,4 +193,6 @@ def sidebar() -> None:
             st.session_state["messages"] = []
             if "current_question" in st.session_state:
                 del st.session_state["current_question"]
+            if "submit_new_question" in st.session_state:
+                del st.session_state["submit_new_question"]
             st.rerun()

@@ -196,9 +196,11 @@ async def run_app(
     # Prompt for user input and save and display
     if question := st.chat_input("Ask a question about your graph data..."):
         st.session_state["current_question"] = question
+        st.session_state["submit_new_question"] = True
 
-    if "current_question" in st.session_state:
+    if st.session_state.get("submit_new_question", False):
         await chat(str(st.session_state.get("current_question", "")))
+        st.session_state["submit_new_question"] = False
 
 
 def main() -> None:
