@@ -30,7 +30,8 @@ def create_neo4j_text2cypher_workflow(
     scope_description: Optional[str] = None,
     max_attempts: int = 3,
     attempt_cypher_execution_on_final_attempt: bool = False,
-    break_into_subquestions: bool = True
+    break_into_subquestions: bool = True,
+    result_limit: int = 50
 ) -> CompiledStateGraph:
     """
     Create a comprehensive Text2Cypher workflow using LangGraph with intelligent query detection.
@@ -56,6 +57,8 @@ def create_neo4j_text2cypher_workflow(
         Whether to attempt Cypher execution on the last attempt, regardless of if the Cypher contains errors, by default False
     break_into_subquestions: bool, optional
         Whether to break complex questions into subquestions, by default True
+    result_limit: int, optional
+        Maximum number of rows to return in query results, by default 50
 
     Returns
     -------
@@ -73,6 +76,7 @@ def create_neo4j_text2cypher_workflow(
         cypher_example_retriever=cypher_example_retriever,
         max_attempts=max_attempts,
         attempt_cypher_execution_on_final_attempt=attempt_cypher_execution_on_final_attempt,
+        result_limit=result_limit,
     )
     summarize = create_summarization_node(llm=llm)
     final_answer = create_final_answer_node()

@@ -1,6 +1,6 @@
 """Neo4j graph visualization component for Streamlit."""
 
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple, List, Set
 import streamlit as st
 import streamlit.components.v1 as components
 from neo4j_viz.neo4j import from_neo4j
@@ -25,6 +25,63 @@ DEFAULT_COLORS = [
     "#20B2AA",  # Light Sea Green
     "#F4A460",  # Sandy Brown
 ]
+
+
+@st.cache_data
+def _generate_color_mapping(node_labels: List[str]) -> Dict[str, str]:
+    """
+    Generate a color mapping for node labels.
+    Cached to avoid recalculation for the same set of labels.
+    
+    Parameters
+    ----------
+    node_labels : List[str]
+        List of unique node labels in order of appearance
+        
+    Returns
+    -------
+    Dict[str, str]
+        Mapping of label to color hex code
+    """
+    color_mapping = {}
+    for i, label in enumerate(node_labels):
+        color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
+        color_mapping[label] = color
+    return color_mapping
+
+
+@st.cache_data
+def _compute_graph_statistics(nodes_data: List[Dict], relationships_data: List[Dict]) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """
+    Compute node and relationship statistics from graph data.
+    Cached to avoid recalculation for the same graph structure.
+    
+    Parameters
+    ----------
+    nodes_data : List[Dict]
+        List of node data dictionaries
+    relationships_data : List[Dict]
+        List of relationship data dictionaries
+        
+    Returns
+    -------
+    Tuple[Dict[str, int], Dict[str, int]]
+        Tuple of (node_labels_count, relationship_types_count)
+    """
+    # Count node labels
+    node_labels_count = {}
+    for node_dict in nodes_data:
+        labels = node_dict.get('labels', [])
+        for label in labels:
+            node_labels_count[label] = node_labels_count.get(label, 0) + 1
+    
+    # Count relationship types
+    relationship_types_count = {}
+    for rel_dict in relationships_data:
+        rel_type = rel_dict.get('type', 'UNKNOWN')
+        relationship_types_count[rel_type] = relationship_types_count.get(rel_type, 0) + 1
+    
+    return node_labels_count, relationship_types_count
 
 
 def render_neo4j_graph_from_result(
@@ -85,12 +142,8 @@ def render_neo4j_graph_from_result(
                                 unique_labels_ordered.append(label)
                                 seen_labels.add(label)
                 
-                # Create color mapping based on order of appearance
-                color_mapping = {}
-                
-                for i, label in enumerate(unique_labels_ordered):
-                    color = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
-                    color_mapping[label] = color
+                # Use cached color mapping generation
+                color_mapping = _generate_color_mapping(unique_labels_ordered)
                 
                 # Apply colors to visualization using the color list
                 if node_color_property == "labels":
@@ -108,20 +161,27 @@ def render_neo4j_graph_from_result(
         try:
             graph_data = result.graph()
             
-            # Count node labels
-            node_labels_count = {}
+            # Convert nodes and relationships to serializable format for caching
+            nodes_data = []
+            relationships_data = []
+            
             if hasattr(graph_data, 'nodes'):
                 for node in graph_data.nodes:
-                    labels = node.labels if hasattr(node, 'labels') else []
-                    for label in labels:
-                        node_labels_count[label] = node_labels_count.get(label, 0) + 1
+                    node_dict = {
+                        'labels': list(node.labels) if hasattr(node, 'labels') else []
+                    }
+                    nodes_data.append(node_dict)
             
-            # Count relationship types
-            relationship_types_count = {}
             if hasattr(graph_data, 'relationships'):
                 for rel in graph_data.relationships:
-                    rel_type = rel.type if hasattr(rel, 'type') else 'UNKNOWN'
-                    relationship_types_count[rel_type] = relationship_types_count.get(rel_type, 0) + 1
+                    rel_dict = {
+                        'type': rel.type if hasattr(rel, 'type') else 'UNKNOWN'
+                    }
+                    relationships_data.append(rel_dict)
+            
+            # Use cached statistics computation
+            node_labels_count, relationship_types_count = _compute_graph_statistics(nodes_data, relationships_data)
+            
         except Exception:
             # If we can't extract legend data, continue without it
             pass

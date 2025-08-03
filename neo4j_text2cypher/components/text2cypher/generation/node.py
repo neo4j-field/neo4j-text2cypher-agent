@@ -15,14 +15,14 @@ from neo4j_text2cypher.components.text2cypher.state import CypherInputState
 from neo4j_text2cypher.retrievers import ConfigCypherExampleRetriever
 from neo4j_text2cypher.retrievers.similarity_retriever import SimilarityBasedCypherExampleRetriever
 
-generation_prompt = create_text2cypher_generation_prompt_template()
-
 
 def create_text2cypher_generation_node(
     llm: BaseChatModel,
     graph: Neo4jGraph,
     cypher_example_retriever: Union[ConfigCypherExampleRetriever, SimilarityBasedCypherExampleRetriever],
+    result_limit: int = 50,
 ) -> Callable[[CypherInputState], Coroutine[Any, Any, dict[str, Any]]]:
+    generation_prompt = create_text2cypher_generation_prompt_template(result_limit)
     text2cypher_chain = generation_prompt | llm | StrOutputParser()
 
     async def generate_cypher(state: CypherInputState) -> Dict[str, Any]:

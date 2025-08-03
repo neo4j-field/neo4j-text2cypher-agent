@@ -25,6 +25,7 @@ def create_text2cypher_agent(
     cypher_example_retriever: Union[ConfigCypherExampleRetriever, SimilarityBasedCypherExampleRetriever],
     max_attempts: int = 3,
     attempt_cypher_execution_on_final_attempt: bool = False,
+    result_limit: int = 50,
 ) -> CompiledStateGraph:
     """
     Create a Text2Cypher agent using LangGraph.
@@ -47,6 +48,8 @@ def create_text2cypher_agent(
     attempt_cypher_execution_on_final_attempt: bool, optional
         THIS MAY BE DANGEROUS.
         Whether to attempt Cypher execution on the last attempt, regardless of if the Cypher contains errors, by default False
+    result_limit: int, optional
+        Maximum number of rows to return in query results, by default 50
 
     Returns
     -------
@@ -56,7 +59,7 @@ def create_text2cypher_agent(
     
     # Create nodes
     generate_cypher = create_text2cypher_generation_node(
-        llm=llm, graph=graph, cypher_example_retriever=cypher_example_retriever
+        llm=llm, graph=graph, cypher_example_retriever=cypher_example_retriever, result_limit=result_limit
     )
     
     validate_cypher = create_text2cypher_validation_node(

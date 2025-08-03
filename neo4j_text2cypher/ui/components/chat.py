@@ -11,7 +11,7 @@ from neo4j_text2cypher.components.state import (
     HistoryRecord,
     OutputState,
 )
-from neo4j_text2cypher.ui.components.visualization import (
+from neo4j_text2cypher.ui.components.neo4j_visualization import (
     render_neo4j_graph_from_result
 )
 
@@ -33,14 +33,17 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
     # Initialize state if needed
     layout_key = f"{viz_id}_layout"
     direction_key = f"{viz_id}_direction"
+    node_limit_key = f"{viz_id}_node_limit"
     
     if layout_key not in st.session_state:
         st.session_state[layout_key] = "force-directed"
     if direction_key not in st.session_state:
         st.session_state[direction_key] = "up"
+    if node_limit_key not in st.session_state:
+        st.session_state[node_limit_key] = 50
     
     # Create controls
-    col1, col2, col3 = st.columns([2, 2, 8])
+    col1, col2, col3, col4 = st.columns([2, 2, 3, 5])
     
     with col1:
         layout = st.selectbox(
@@ -68,7 +71,7 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
     
     with viz_container:
         # Create columns for visualization and legend
-        viz_col, legend_col = st.columns([3, 1])
+        viz_col, legend_col = st.columns([5, 1])
         
         with viz_col:
             # Render with selected layout and direction
