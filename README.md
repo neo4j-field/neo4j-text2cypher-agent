@@ -211,7 +211,7 @@ neo4j-text2cypher/
 │   │   ├── components/                     # UI components
 │   │   │   ├── chat.py                     # Enhanced chat interface
 │   │   │   ├── sidebar.py                  # Sidebar with query processing controls
-│   │   │   └── visualization.py            # Graph visualization (50-node limit)
+│   │   │   └── neo4j_visualization.py      # Neo4j graph visualization (50-node limit)
 │   │   └── streamlit_app.py                # Main Streamlit application with caching
 │   └── utils/                              # Utility functions
 │       ├── config.py                       # Unified configuration management
@@ -260,6 +260,7 @@ The Streamlit web application provides an intuitive interface for interacting wi
 - **Break questions into subquestions**: Toggle between intelligent question decomposition (default) and direct passthrough mode for simple queries
 - **Cypher Retriever Strategy**: Choose between "Static" (uses all configured examples) and "Semantic Similarity" (in-memory cosine similarity using your configured LLM's embeddings to select most relevant examples)
 - **Number of examples**: When using semantic similarity, control how many examples to retrieve (1-20, shown only when semantic similarity is selected)
+- **Maximum query results**: Control the maximum number of results returned by queries (10-100, default 50) to balance performance and data completeness
 - **Real-time Updates**: Changes take effect immediately and rebuild the workflow while preserving database connections
 - **Performance Optimization**: Settings are optimized for different query types and complexity levels
 
@@ -283,6 +284,11 @@ The main chat interface includes several enhanced features:
 - **Expandable Sections**: All technical details are collapsible for clean reading
 - **Copy-Friendly Code**: Cypher queries are displayed in formatted code blocks
 - **Data Export**: Query results displayed in interactive Streamlit DataFrames
+- **Graph Visualization Controls**: 
+  - Layout selection: Choose between force-directed (default) or hierarchical layouts
+  - Direction control: For hierarchical layout, set direction (up, down, left, right)
+  - Results Overview: Color-coded legend showing node labels and relationship types with counts
+  - Optimized spacing: 5:1 column ratio for maximum visualization area
 
 ### Standard Query Interface
 
