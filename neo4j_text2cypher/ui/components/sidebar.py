@@ -2,7 +2,7 @@ import streamlit as st
 from neo4j_text2cypher.workflows.neo4j_text2cypher_workflow import create_neo4j_text2cypher_workflow
 
 
-def _recreate_workflow_with_new_settings(break_into_subquestions: bool, similarity_type: str, k_value: int) -> None:
+def _recreate_workflow_with_new_settings(break_into_subquestions: bool, similarity_type: str, k_value: int, result_limit: int) -> None:
     """
     Recreate the workflow with new settings without reconnecting to Neo4j.
     
@@ -36,6 +36,7 @@ def _recreate_workflow_with_new_settings(break_into_subquestions: bool, similari
             max_attempts=components["max_attempts"],
             attempt_cypher_execution_on_final_attempt=components["attempt_cypher_execution_on_final_attempt"],
             break_into_subquestions=break_into_subquestions,  # New setting
+            result_limit=result_limit,  # New setting
         )
         
         # Update session state
@@ -43,23 +44,19 @@ def _recreate_workflow_with_new_settings(break_into_subquestions: bool, similari
         st.session_state.break_into_subquestions = break_into_subquestions
         st.session_state.similarity_type = similarity_type
         st.session_state.k_value = k_value
+        st.session_state.result_limit = result_limit
         
-        # Update workflow components with new retriever
+        # Update workflow components with new retriever and result_limit
         st.session_state.workflow_components["cypher_example_retriever"] = retriever
+        st.session_state.workflow_components["result_limit"] = result_limit
         
-        # Clear any pending question to prevent re-running
-        if "current_question" in st.session_state:
-            del st.session_state["current_question"]
+        # Prevent question re-submission after settings change
+        st.session_state["submit_new_question"] = False
         
         # Show user that settings were updated with better formatting
-        planner_status = "enabled" if break_into_subquestions else "disabled"
-        st.success(f"""✅ Settings updated:
-
-    • Break questions into subquestions: {planner_status}
-
-    • Cypher Retriever Strategy: {similarity_type}
-
-    • Number of examples: {k_value if similarity_type == "Semantic Similarity" else "All"}""")
+        planner_status = "Enabled" if break_into_subquestions else "Disabled"
+        examples_info = f"{k_value} examples" if similarity_type == "Semantic Similarity" else "All"
+        st.success(f"✅ Settings updated | Planner: {planner_status} | Retriever: {similarity_type} ({examples_info}) | Result Limit: {result_limit} rows")
         
     except Exception as e:
         st.error(f"❌ Failed to update settings: {str(e)}")
@@ -81,97 +78,157 @@ def sidebar() -> None:
                 display_text, key=f"sidebar_example_{i}", help=question
             ):
                 st.session_state["current_question"] = question
+                st.session_state["submit_new_question"] = True
 
         st.sidebar.divider()
 
     # 2. Query Processing Settings (controls that change behavior)
-    st.sidebar.subheader("🔧 Query Processing Settings")
+    st.sidebar.markdown("## 🔧 Query Processing Settings")
     
     # Get current settings
     current_break_into_subquestions = st.session_state.get("break_into_subquestions", True)
     current_similarity_type = st.session_state.get("similarity_type", "Static")
     current_k_value = st.session_state.get("k_value", 5)
     
-    # Planner Toggle
-    break_into_subquestions = st.sidebar.checkbox(
-        "Break questions into subquestions", 
-        value=current_break_into_subquestions,
-        help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is."
-    )
-    
-    # Cypher Retriever Strategy with emoji
-    similarity_type = st.sidebar.radio(
-        "🔍 Cypher Retriever Strategy",
-        options=["Static", "Semantic Similarity"],
-        index=0 if current_similarity_type == "Static" else 1,
-        help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity."
-    )
-    
-    # K Value slider (only show when semantic similarity is selected)
-    if similarity_type == "Semantic Similarity":
-        k_value = st.sidebar.slider(
-            "Number of examples",
-            min_value=1,
-            max_value=20,
-            value=10 if current_k_value == 5 else current_k_value,
-            help="Number of most similar examples to retrieve for query generation"
-        )
-    else:
-        k_value = current_k_value  # Keep current value when not using semantic similarity
+    # Create container for settings with proper column-based indentation
+    with st.sidebar.container():
+        # Planner Behaviour section with minimal indent
+        planner_indent, planner_content = st.sidebar.columns([0.03, 0.97])
+        with planner_content:
+            st.markdown("#### 🧠 Planner Behaviour")
+        
+        # Control with more visible indent
+        planner_control_indent, planner_control_content = st.sidebar.columns([0.08, 0.92])
+        with planner_control_content:
+            break_into_subquestions_option = st.radio(
+                "Break questions into subquestions",
+                options=["Enabled", "Disabled"],
+                index=0 if current_break_into_subquestions else 1,
+                help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is.",
+                horizontal=True  # Make radio buttons horizontal to save space and look cleaner
+            )
+            break_into_subquestions = (break_into_subquestions_option == "Enabled")
+        
+        # Cypher Retriever Strategy section with minimal indent
+        retriever_indent, retriever_content = st.sidebar.columns([0.03, 0.97])
+        with retriever_content:
+            st.markdown("#### 🔍 Cypher Retriever Strategy")
+        
+        # Control with more visible indent
+        retriever_control_indent, retriever_control_content = st.sidebar.columns([0.08, 0.92])
+        with retriever_control_content:
+            similarity_type = st.radio(
+                "Select retriever strategy",
+                options=["Static", "Semantic Similarity"],
+                index=0 if current_similarity_type == "Static" else 1,
+                help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
+                horizontal=True  # Make radio buttons horizontal for consistency
+            )
+            
+            # K Value slider (only show when semantic similarity is selected)
+            if similarity_type == "Semantic Similarity":
+                k_value = st.slider(
+                    "Number of examples",
+                    min_value=1,
+                    max_value=20,
+                    value=10 if current_k_value == 5 else current_k_value,
+                    help="Number of most similar examples to retrieve for query generation"
+                )
+            else:
+                k_value = current_k_value  # Keep current value when not using semantic similarity
+        
+        # Query Result Limit section with minimal indent
+        limit_indent, limit_content = st.sidebar.columns([0.03, 0.97])
+        with limit_content:
+            st.markdown("#### 🔢 Query Result Limit")
+        
+        # Control with more visible indent
+        limit_control_indent, limit_control_content = st.sidebar.columns([0.08, 0.92])
+        with limit_control_content:
+            current_result_limit = st.session_state.get("result_limit", 50)
+            result_limit = st.select_slider(
+                "Maximum query results",
+                options=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+                value=current_result_limit,
+                help="Limit the number of rows returned by queries"
+            )
     
     # If any setting changed, recreate workflow
     settings_changed = (
         break_into_subquestions != current_break_into_subquestions or
         similarity_type != current_similarity_type or
-        k_value != current_k_value
+        k_value != current_k_value or
+        result_limit != current_result_limit
     )
     
     if settings_changed and st.session_state.get("workflow_components"):
-        _recreate_workflow_with_new_settings(break_into_subquestions, similarity_type, k_value)
+        _recreate_workflow_with_new_settings(break_into_subquestions, similarity_type, k_value, result_limit)
     
     st.sidebar.divider()
 
     # 3. System Information (informational status)
-    st.sidebar.subheader("⚙️ System Information")
+    st.sidebar.markdown("## ⚙️ System Information")
     
-    # LLM Details Section
-    st.sidebar.write("**LLM Details**")
-    model_name = st.session_state.get("model_name", "Unknown")
-    model_provider = st.session_state.get("model_provider", "Unknown")
-    model_temperature = st.session_state.get("model_temperature", "Unknown")
-    st.sidebar.markdown(f"**Provider:** {model_provider} &nbsp;&nbsp;|&nbsp;&nbsp; **Model:** {model_name} &nbsp;&nbsp;|&nbsp;&nbsp; **Temperature:** {model_temperature}")
-    
-    # Neo4j Database Details
-    st.sidebar.write("")  # Add some space
-    st.sidebar.write("**Neo4j Database Details**")
-    
-    # Get Neo4j version info dynamically
-    neo4j_database = st.session_state.get("neo4j_database", "Unknown")
-    neo4j_status = st.session_state.get("neo4j_connected", False)
-    connection_status = "🟢 Connected" if neo4j_status else "🔴 Disconnected"
-    
-    # Query Neo4j version if connected and agent is available
-    if neo4j_status and st.session_state.get("workflow_components"):
-        try:
-            graph = st.session_state.workflow_components["graph"]
-            version_result = graph.query("""
-                CALL dbms.components() YIELD name, versions, edition
-                UNWIND versions AS version
-                WITH * WHERE name = 'Neo4j Kernel'
-                RETURN edition, version
-            """)
-            if version_result and len(version_result) > 0:
-                neo4j_edition = version_result[0].get('edition', 'Unknown')
-                neo4j_version = version_result[0].get('version', 'Unknown')
-                version_display = f"{neo4j_version} ({neo4j_edition})"
+    # Use the same container and column approach for consistency
+    with st.sidebar.container():
+        # LLM Details section with minimal indent
+        llm_indent, llm_content = st.sidebar.columns([0.03, 0.97])
+        with llm_content:
+            st.markdown("#### LLM Details")
+        
+        # LLM info with more visible indent
+        llm_info_indent, llm_info_content = st.sidebar.columns([0.05, 0.95])
+        with llm_info_content:
+            model_name = st.session_state.get("model_name", "Unknown")
+            model_provider = st.session_state.get("model_provider", "Unknown")
+            model_temperature = st.session_state.get("model_temperature", "Unknown")
+            # Create another level of indentation for the actual values
+            detail_indent, detail_content = st.columns([0.01, 0.99])
+            with detail_content:
+                st.markdown(f"**Provider:** {model_provider}")
+                st.markdown(f"**Model:** {model_name}")
+                st.markdown(f"**Temperature:** {model_temperature}")
+        
+        # Neo4j Database Details section with minimal indent
+        neo4j_indent, neo4j_content = st.sidebar.columns([0.03, 0.97])
+        with neo4j_content:
+            st.markdown("#### Neo4j Database Details")
+        
+        # Neo4j info with more visible indent
+        neo4j_info_indent, neo4j_info_content = st.sidebar.columns([0.05, 0.95])
+        with neo4j_info_content:
+            # Get Neo4j version info dynamically
+            neo4j_database = st.session_state.get("neo4j_database", "Unknown")
+            neo4j_status = st.session_state.get("neo4j_connected", False)
+            connection_status = "🟢 Connected" if neo4j_status else "🔴 Disconnected"
+            
+            # Query Neo4j version if connected and agent is available
+            if neo4j_status and st.session_state.get("workflow_components"):
+                try:
+                    graph = st.session_state.workflow_components["graph"]
+                    version_result = graph.query("""
+                        CALL dbms.components() YIELD name, versions, edition
+                        UNWIND versions AS version
+                        WITH * WHERE name = 'Neo4j Kernel'
+                        RETURN edition, version
+                    """)
+                    if version_result and len(version_result) > 0:
+                        neo4j_edition = version_result[0].get('edition', 'Unknown')
+                        neo4j_version = version_result[0].get('version', 'Unknown')
+                        version_display = f"{neo4j_version} ({neo4j_edition})"
+                    else:
+                        version_display = "Unknown"
+                except Exception:
+                    version_display = "Unknown"
             else:
                 version_display = "Unknown"
-        except Exception:
-            version_display = "Unknown"
-    else:
-        version_display = "Unknown"
-    
-    st.sidebar.markdown(f"**Version:** {version_display} &nbsp;&nbsp;|&nbsp;&nbsp; **Database:** {neo4j_database} &nbsp;&nbsp;|&nbsp;&nbsp; **Status:** {connection_status}")
+            
+            # Create another level of indentation for the actual values
+            neo4j_detail_indent, neo4j_detail_content = st.columns([0.01, 0.99])
+            with neo4j_detail_content:
+                st.markdown(f"**Version:** {version_display}")
+                st.markdown(f"**Database:** {neo4j_database}")
+                st.markdown(f"**Status:** {connection_status}")
     
     # Add some spacing before Reset Chat button
     st.sidebar.write("")
@@ -183,4 +240,6 @@ def sidebar() -> None:
             st.session_state["messages"] = []
             if "current_question" in st.session_state:
                 del st.session_state["current_question"]
+            if "submit_new_question" in st.session_state:
+                del st.session_state["submit_new_question"]
             st.rerun()

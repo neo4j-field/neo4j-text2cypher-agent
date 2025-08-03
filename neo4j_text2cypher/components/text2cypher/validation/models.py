@@ -12,8 +12,6 @@ class Property(BaseModel):
     Represents a filter condition based on a specific node property in a graph in a Cypher statement.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
     node_label: str = Field(
         description="The label of the node to which this property belongs."
     )
@@ -30,8 +28,6 @@ class ValidateCypherOutput(BaseModel):
     Represents the validation result of a Cypher query's output,
     including any errors and applied filters.
     """
-
-    model_config = ConfigDict(extra="forbid")
 
     errors: Optional[List[str]] = Field(
         description="A list of syntax or semantical errors in the Cypher statement. Always explain the discrepancy between schema and Cypher statement"

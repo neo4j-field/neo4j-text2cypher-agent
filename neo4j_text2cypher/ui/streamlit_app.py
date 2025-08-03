@@ -130,6 +130,7 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                         cypher_example_retriever=cypher_example_retriever,
                         attempt_cypher_execution_on_final_attempt=False,
                         break_into_subquestions=True,  # Default to enabled
+                        result_limit=50,  # Default result limit
                     )
                     step_placeholders["workflow"].write("✅ Workflow created")
                     
@@ -142,6 +143,7 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                     st.session_state.break_into_subquestions = True  # Default to enabled
                     st.session_state.similarity_type = "Static"  # Default to static retrieval
                     st.session_state.k_value = 10  # Default K value for semantic similarity
+                    st.session_state.result_limit = 50  # Default result limit
                     
                     # Store system information for UI display
                     st.session_state.model_name = llm_config.model
@@ -159,6 +161,7 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                         "max_attempts": 3,
                         "attempt_cypher_execution_on_final_attempt": False,
                         "config_loader": config_loader,  # Needed for similarity retriever
+                        "result_limit": 50,  # Default result limit
                     }
                     
                     # Application initialization complete
@@ -196,9 +199,11 @@ async def run_app(
     # Prompt for user input and save and display
     if question := st.chat_input("Ask a question about your graph data..."):
         st.session_state["current_question"] = question
+        st.session_state["submit_new_question"] = True
 
-    if "current_question" in st.session_state:
+    if st.session_state.get("submit_new_question", False):
         await chat(str(st.session_state.get("current_question", "")))
+        st.session_state["submit_new_question"] = False
 
 
 def main() -> None:

@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import hashlib
 
 import pandas as pd
 import streamlit as st
@@ -10,9 +11,103 @@ from neo4j_text2cypher.components.state import (
     HistoryRecord,
     OutputState,
 )
-from neo4j_text2cypher.ui.components.visualization import (
+from neo4j_text2cypher.ui.components.neo4j_visualization import (
     render_neo4j_graph_from_result
 )
+
+
+@st.fragment
+def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> None:
+    """
+    Fragment-based visualization controls that won't trigger full page reruns.
+    
+    Parameters
+    ----------
+    viz_id : str
+        Unique identifier for this visualization
+    result_obj : Result
+        The Neo4j result object to visualize
+    cypher : Dict[str, Any]
+        The cypher query details
+    """
+    # Initialize state if needed
+    layout_key = f"{viz_id}_layout"
+    direction_key = f"{viz_id}_direction"
+    node_limit_key = f"{viz_id}_node_limit"
+    
+    if layout_key not in st.session_state:
+        st.session_state[layout_key] = "force-directed"
+    if direction_key not in st.session_state:
+        st.session_state[direction_key] = "up"
+    if node_limit_key not in st.session_state:
+        st.session_state[node_limit_key] = 50
+    
+    # Create controls
+    col1, col2, col3, col4 = st.columns([2, 2, 3, 5])
+    
+    with col1:
+        layout = st.selectbox(
+            "Layout",
+            options=["force-directed", "hierarchical"],
+            key=layout_key,
+            help="Select visualization layout"
+        )
+    
+    with col2:
+        if layout == "hierarchical":
+            direction = st.selectbox(
+                "Direction",
+                options=["up", "down", "left", "right"],
+                key=direction_key,
+                help="Direction for hierarchical layout"
+            )
+        else:
+            # Keep empty for layout consistency
+            st.empty()
+            direction = st.session_state[direction_key]
+    
+    # Create visualization container that will update when controls change
+    viz_container = st.container()
+    
+    with viz_container:
+        # Create columns for visualization and legend
+        viz_col, legend_col = st.columns([5, 1])
+        
+        with viz_col:
+            # Render with selected layout and direction
+            node_labels, rel_types, color_mapping = render_neo4j_graph_from_result(
+                result_obj, 
+                height=600,
+                layout=layout,
+                direction=direction if layout == "hierarchical" else None
+            )
+        
+        with legend_col:
+            if node_labels or rel_types:
+                st.markdown("### Results Overview")
+                
+                if node_labels:
+                    total_nodes = sum(node_labels.values())
+                    st.markdown(f"#### **Nodes ({total_nodes})**")
+                    for label, count in sorted(node_labels.items()):
+                        if color_mapping and label in color_mapping:
+                            color = color_mapping[label]
+                            st.markdown(
+                                f'<span style="background-color: {color}; color: black; padding: 2px 6px; border-radius: 12px; font-weight: bold;">{label} ({count})</span>',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(f"**{label} ({count})**")
+                    st.write("")  # Add space
+                
+                if rel_types:
+                    total_relationships = sum(rel_types.values())
+                    st.markdown(f"#### **Relationships ({total_relationships})**")
+                    for rel_type, count in sorted(rel_types.items()):
+                        st.markdown(
+                            f'<span style="background-color: #E0E0E0; color: black; padding: 2px 6px; border-radius: 12px; font-weight: bold;">{rel_type} ({count})</span>',
+                            unsafe_allow_html=True
+                        )
 
 
 def convert_records_to_dataframe(records: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -112,7 +207,13 @@ def _display_cypher_results(cypher: Dict[str, Any]) -> None:
             
             if nodes_count > 0:
                 has_visualization = True
-                render_neo4j_graph_from_result(result_obj, height=600)
+                
+                # Create a unique ID for this visualization instance
+                # Use the Python id() of the cypher dict to ensure uniqueness
+                viz_id = f"viz_{id(cypher)}"
+                
+                # Call the fragment that contains both controls and visualization
+                visualization_controls(viz_id, result_obj, cypher)
         except Exception as e:
             st.error(f"Error displaying graph visualization: {str(e)}")
     
