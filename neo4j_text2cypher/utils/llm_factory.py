@@ -250,6 +250,8 @@ def _create_azure_openai_embeddings() -> Embeddings:
     RuntimeError
         If required Azure OpenAI environment variables are not set
     """
+    print("Creating Azure OpenAI embeddings...")
+    
     try:
         from langchain_openai import AzureOpenAIEmbeddings
     except ImportError as e:
@@ -271,8 +273,31 @@ def _create_azure_openai_embeddings() -> Embeddings:
             f"Missing required environment variables for Azure OpenAI embeddings: {missing_vars}"
         )
     
-    return AzureOpenAIEmbeddings(
+    # Check for embeddings deployment
+    embeddings_deployment = os.getenv("AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT")
+    if not embeddings_deployment:
+        raise RuntimeError(
+            "AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT environment variable is required for Azure OpenAI embeddings.\n"
+            "\n"
+            "To fix this:\n"
+            "1. In Azure Portal, go to your Azure OpenAI resource\n"
+            "2. Navigate to 'Model deployments' or 'Deployments'\n"
+            "3. Find or create a deployment using an embedding model (e.g., text-embedding-ada-002)\n"
+            "4. Copy the deployment name (not the model name)\n"
+            "5. Set the environment variable: AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=<your-deployment-name>\n"
+            "\n"
+            "Example: AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=my-embeddings"
+        )
+    
+    print(f"Using Azure embeddings deployment: {embeddings_deployment}")
+    print(f"Azure endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT')}")
+    
+    embeddings = AzureOpenAIEmbeddings(
+        deployment=embeddings_deployment,
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
     )
+    
+    print("✅ Azure OpenAI embeddings created successfully")
+    return embeddings
