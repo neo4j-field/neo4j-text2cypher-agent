@@ -280,23 +280,41 @@ def _create_azure_openai_embeddings() -> Embeddings:
             "AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT environment variable is required for Azure OpenAI embeddings.\n"
             "\n"
             "To fix this:\n"
-            "1. In Azure Portal, go to your Azure OpenAI resource\n"
-            "2. Navigate to 'Model deployments' or 'Deployments'\n"
-            "3. Find or create a deployment using an embedding model (e.g., text-embedding-ada-002)\n"
-            "4. Copy the deployment name (not the model name)\n"
-            "5. Set the environment variable: AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=<your-deployment-name>\n"
+            "1. Find your embeddings deployment name in one of these locations:\n"
+            "   - Azure Portal > Your OpenAI Resource > Deployments\n"
+            "   - Azure AI Foundry portal > My assets > Models + endpoints\n"
+            "   - Direct link: https://oai.azure.com/resource/deployments\n"
+            "2. Look for a deployment using an embedding model (e.g., text-embedding-ada-002)\n"
+            "3. Copy the deployment name (not the model name)\n"
+            "4. Set the environment variable: AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=<your-deployment-name>\n"
             "\n"
             "Example: AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT=my-embeddings"
         )
     
     print(f"Using Azure embeddings deployment: {embeddings_deployment}")
-    print(f"Azure endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT')}")
+    
+    # Check for separate embeddings endpoint, fall back to main endpoint
+    embeddings_endpoint = os.getenv("AZURE_OPENAI_EMBEDDINGS_ENDPOINT") or os.getenv("AZURE_OPENAI_ENDPOINT")
+    if os.getenv("AZURE_OPENAI_EMBEDDINGS_ENDPOINT"):
+        print(f"Using separate endpoint for embeddings: {embeddings_endpoint}")
+    else:
+        print(f"Using main Azure endpoint: {embeddings_endpoint}")
+    
+    # Check for separate embeddings API key, fall back to main API key
+    embeddings_api_key = os.getenv("AZURE_OPENAI_EMBEDDINGS_API_KEY") or os.getenv("AZURE_OPENAI_API_KEY")
+    if os.getenv("AZURE_OPENAI_EMBEDDINGS_API_KEY"):
+        print("Using separate API key for embeddings")
+    
+    # Check for separate embeddings API version, fall back to main API version
+    embeddings_api_version = os.getenv("AZURE_OPENAI_EMBEDDINGS_API_VERSION") or os.getenv("AZURE_OPENAI_API_VERSION")
+    if os.getenv("AZURE_OPENAI_EMBEDDINGS_API_VERSION"):
+        print(f"Using separate API version for embeddings: {embeddings_api_version}")
     
     embeddings = AzureOpenAIEmbeddings(
         deployment=embeddings_deployment,
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        api_key=embeddings_api_key,
+        azure_endpoint=embeddings_endpoint,
+        api_version=embeddings_api_version,
     )
     
     print("✅ Azure OpenAI embeddings created successfully")
