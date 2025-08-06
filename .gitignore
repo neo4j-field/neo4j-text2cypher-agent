@@ -180,3 +180,14 @@ Desktop.ini
 # Streamlit
 .streamlit/
 test_planner_workflow.py
+
+# yworks specific ignores
+yworks/npm_build/node_modules/
+yworks/npm_build/package-lock.json
+yworks/dist/
+yworks/lib/
+yworks/__pycache__/
+yworks/.streamlit/
+
+# Temporary test files
+test_neo4j_records.py
