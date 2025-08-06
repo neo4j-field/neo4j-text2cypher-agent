@@ -51,7 +51,7 @@ def _generate_color_mapping(node_labels: List[str]) -> Dict[str, str]:
 
 
 @st.cache_data
-def _compute_graph_statistics(nodes_data: List[Dict], relationships_data: List[Dict]) -> Tuple[Dict[str, int], Dict[str, int]]:
+def _compute_graph_statistics(nodes_data: List[Dict], relationships_data: List[Dict]) -> Tuple[Dict[str, int], Dict[str, int], int]:
     """
     Compute node and relationship statistics from graph data.
     Cached to avoid recalculation for the same graph structure.
@@ -65,15 +65,18 @@ def _compute_graph_statistics(nodes_data: List[Dict], relationships_data: List[D
         
     Returns
     -------
-    Tuple[Dict[str, int], Dict[str, int]]
-        Tuple of (node_labels_count, relationship_types_count)
+    Tuple[Dict[str, int], Dict[str, int], int]
+        Tuple of (node_labels_count, relationship_types_count, unique_node_count)
     """
-    # Count node labels
+    # Count node labels (for distribution display)
     node_labels_count = {}
     for node_dict in nodes_data:
         labels = node_dict.get('labels', [])
         for label in labels:
             node_labels_count[label] = node_labels_count.get(label, 0) + 1
+    
+    # Count actual unique nodes
+    unique_node_count = len(nodes_data)
     
     # Count relationship types
     relationship_types_count = {}
@@ -81,7 +84,7 @@ def _compute_graph_statistics(nodes_data: List[Dict], relationships_data: List[D
         rel_type = rel_dict.get('type', 'UNKNOWN')
         relationship_types_count[rel_type] = relationship_types_count.get(rel_type, 0) + 1
     
-    return node_labels_count, relationship_types_count
+    return node_labels_count, relationship_types_count, unique_node_count
 
 
 def render_neo4j_graph_from_result(
@@ -92,7 +95,7 @@ def render_neo4j_graph_from_result(
     row_limit: int = 50,
     layout: str = "force-directed",
     direction: Optional[str] = None
-) -> Tuple[Optional[Dict[str, int]], Optional[Dict[str, int]], Optional[Dict[str, str]]]:
+) -> Tuple[Optional[Dict[str, int]], Optional[Dict[str, int]], Optional[Dict[str, str]], Optional[int]]:
     """
     Render Neo4j Result.graph as an interactive visualization.
     
@@ -115,12 +118,13 @@ def render_neo4j_graph_from_result(
         
     Returns
     -------
-    Tuple[Optional[Dict[str, int]], Optional[Dict[str, int]], Optional[Dict[str, str]]]
-        Tuple of (node_labels_count, relationship_types_count, color_mapping) for legend generation
+    Tuple[Optional[Dict[str, int]], Optional[Dict[str, int]], Optional[Dict[str, str]], Optional[int]]
+        Tuple of (node_labels_count, relationship_types_count, color_mapping, unique_node_count) for legend generation
     """
     node_labels_count = None
     relationship_types_count = None
     color_mapping = None
+    unique_node_count = None
     try:
         # Create visualization directly from Neo4j result with row limit
         viz = from_neo4j(result, row_limit=row_limit)
@@ -180,7 +184,7 @@ def render_neo4j_graph_from_result(
                     relationships_data.append(rel_dict)
             
             # Use cached statistics computation
-            node_labels_count, relationship_types_count = _compute_graph_statistics(nodes_data, relationships_data)
+            node_labels_count, relationship_types_count, unique_node_count = _compute_graph_statistics(nodes_data, relationships_data)
             
         except Exception:
             # If we can't extract legend data, continue without it
@@ -240,4 +244,4 @@ def render_neo4j_graph_from_result(
         st.error(f"Error rendering graph visualization: {str(e)}")
         st.exception(e)
     
-    return node_labels_count, relationship_types_count, color_mapping
+    return node_labels_count, relationship_types_count, color_mapping, unique_node_count

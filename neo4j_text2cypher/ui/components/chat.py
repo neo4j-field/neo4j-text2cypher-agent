@@ -75,7 +75,7 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
         
         with viz_col:
             # Render with selected layout and direction
-            node_labels, rel_types, color_mapping = render_neo4j_graph_from_result(
+            node_labels, rel_types, color_mapping, unique_node_count = render_neo4j_graph_from_result(
                 result_obj, 
                 height=600,
                 layout=layout,
@@ -87,7 +87,8 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
                 st.markdown("### Results Overview")
                 
                 if node_labels:
-                    total_nodes = sum(node_labels.values())
+                    # Use unique_node_count if available, otherwise fall back to sum (for backward compatibility)
+                    total_nodes = unique_node_count if unique_node_count is not None else sum(node_labels.values())
                     st.markdown(f"#### **Nodes ({total_nodes})**")
                     for label, count in sorted(node_labels.items()):
                         if color_mapping and label in color_mapping:
