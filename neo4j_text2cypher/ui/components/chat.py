@@ -115,10 +115,44 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
                         )
 
 
+def _is_graph_value(value: Any) -> bool:
+    """
+    Check if a value is a graph object (node, relationship, or path).
+    
+    Parameters
+    ----------
+    value : Any
+        The value to check
+        
+    Returns
+    -------
+    bool
+        True if the value is a graph object
+    """
+    # Check for Neo4j Node or Relationship (they're usually dicts with specific attributes)
+    if isinstance(value, dict):
+        # Neo4j nodes/relationships typically have 'id', 'labels', or 'type' attributes
+        # But to be safe, we'll consider any dict as potential graph object
+        # unless it looks like plain data
+        graph_indicators = {'id', 'labels', 'type', 'properties', 'start_node', 'end_node'}
+        return bool(graph_indicators.intersection(value.keys()))
+    
+    # Check for paths (usually lists containing nodes and relationships)
+    if isinstance(value, list) and value:
+        # If it's a list of dicts, it might be a path
+        first_item = value[0]
+        if isinstance(first_item, dict):
+            # Check if it looks like graph elements
+            graph_indicators = {'id', 'labels', 'type', 'properties', 'start_node', 'end_node'}
+            return bool(graph_indicators.intersection(first_item.keys()))
+    
+    return False
+
+
 def convert_records_to_dataframe(records: List[Dict[str, Any]]) -> pd.DataFrame:
     """
     Convert list of records to a pandas DataFrame for better display.
-    Handles complex data types including Neo4j paths by converting them to readable representations.
+    Filters out graph objects (nodes, relationships, paths) when mixed with scalar data.
     
     Parameters
     ----------
@@ -128,19 +162,42 @@ def convert_records_to_dataframe(records: List[Dict[str, Any]]) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        DataFrame for interactive display
+        DataFrame for interactive display with graph objects filtered out
     """
     if not records:
         return pd.DataFrame()
     
     try:
-        # Convert complex objects to string representations for DataFrame compatibility
-        cleaned_records = []
-        for record in records:
-            cleaned_record = {}
-            for key, value in record.items():
-                cleaned_record[key] = _convert_value_for_dataframe(value)
-            cleaned_records.append(cleaned_record)
+        # First, analyze which columns contain graph vs scalar data
+        if records:
+            first_record = records[0]
+            graph_columns = set()
+            scalar_columns = set()
+            
+            for key, value in first_record.items():
+                if _is_graph_value(value):
+                    graph_columns.add(key)
+                else:
+                    scalar_columns.add(key)
+        
+        # If we have both graph and scalar columns, filter out graph columns
+        if graph_columns and scalar_columns:
+            # Filter to only scalar columns for cleaner display
+            cleaned_records = []
+            for record in records:
+                cleaned_record = {}
+                for key in scalar_columns:
+                    if key in record:
+                        cleaned_record[key] = _convert_value_for_dataframe(record[key])
+                cleaned_records.append(cleaned_record)
+        else:
+            # No filtering needed - either all graph or all scalar
+            cleaned_records = []
+            for record in records:
+                cleaned_record = {}
+                for key, value in record.items():
+                    cleaned_record[key] = _convert_value_for_dataframe(value)
+                cleaned_records.append(cleaned_record)
         
         return pd.DataFrame(cleaned_records)
         
@@ -192,38 +249,17 @@ def _convert_path_or_list(path_list: list) -> str:
 
 def _display_cypher_results(cypher: Dict[str, Any]) -> None:
     """
-    Display results for a single cypher query (visualization and/or DataFrame).
+    Display results for a single cypher query (DataFrame and/or visualization).
     
     Parameters
     ----------
     cypher : Dict[str, Any]
         The cypher record containing statement, records, result, etc.
     """
-    # Check if we have visualization data first
-    result_obj = cypher.get("result")
     records = cypher.get("records")
-    has_visualization = False
     
-    if result_obj and records:
-        try:
-            # Check if Result has nodes to visualize
-            graph_data = result_obj.graph()
-            nodes_count = len(graph_data.nodes) if hasattr(graph_data, 'nodes') else 0
-            
-            if nodes_count > 0:
-                has_visualization = True
-                
-                # Create a unique ID for this visualization instance
-                # Use the Python id() of the cypher dict to ensure uniqueness
-                viz_id = f"viz_{id(cypher)}"
-                
-                # Call the fragment that contains both controls and visualization
-                visualization_controls(viz_id, result_obj, cypher)
-        except Exception as e:
-            st.error(f"Error displaying graph visualization: {str(e)}")
-    
-    # Only show DataFrame if no visualization and not pure node query
-    if not has_visualization and records and not _has_only_node_objects(records):
+    # Show DataFrame first if there are records with non-graph data
+    if records and not _has_only_node_objects(records):
         df = convert_records_to_dataframe(records)
         if not df.empty:
             st.subheader("Results")
@@ -234,11 +270,29 @@ def _display_cypher_results(cypher: Dict[str, Any]) -> None:
             st.json(records[:10])  # Show first 10 records as JSON
             if len(records) > 10:
                 st.caption(f"Showing first 10 of {len(records)} records")
+    
+    # Then show visualization if we have graph data
+    result_obj = cypher.get("result")
+    if result_obj and records:
+        try:
+            # Check if Result has nodes to visualize
+            graph_data = result_obj.graph()
+            nodes_count = len(graph_data.nodes) if hasattr(graph_data, 'nodes') else 0
+            
+            if nodes_count > 0:
+                # Create a unique ID for this visualization instance
+                # Use the Python id() of the cypher dict to ensure uniqueness
+                viz_id = f"viz_{id(cypher)}"
+                
+                # Call the fragment that contains both controls and visualization
+                visualization_controls(viz_id, result_obj, cypher)
+        except Exception as e:
+            st.error(f"Error displaying graph visualization: {str(e)}")
 
 
 def _has_only_node_objects(records: List[Dict[str, Any]]) -> bool:
     """
-    Check if records contain ONLY node/relationship objects (no other data types).
+    Check if records contain ONLY graph objects (nodes/relationships/paths) with no scalar data.
     
     Parameters
     ----------
@@ -248,7 +302,7 @@ def _has_only_node_objects(records: List[Dict[str, Any]]) -> bool:
     Returns
     -------
     bool
-        True if records contain only node/relationship objects
+        True if records contain only graph objects
     """
     if not records:
         return False
@@ -256,9 +310,10 @@ def _has_only_node_objects(records: List[Dict[str, Any]]) -> bool:
     # Check first few records for performance
     for record in records[:3]:
         for value in record.values():
-            if not isinstance(value, dict):
-                return False  # Found non-node data, so not "only nodes"
-    return True  # All values are dicts (nodes/relationships)
+            # Use our graph detection helper to check if this is a graph object
+            if not _is_graph_value(value):
+                return False  # Found non-graph data
+    return True  # All values are graph objects
 
 
 def _convert_node_or_relationship(obj: dict) -> str:

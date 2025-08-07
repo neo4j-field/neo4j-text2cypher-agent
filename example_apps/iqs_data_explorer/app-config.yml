@@ -159,7 +159,7 @@ example_queries:
   - question: Show me the category, problem and question hierarchy
     cql: |-
       MATCH path=(c:Category)<-[r1:HAS_CATEGORY]-(p:Problem)<-[r2:HAS_PROBLEM]-(q:Question)
-      RETURN c, p, q
+      RETURN c, p, q, c.id, q.question
   - question: Show me category nodes and their descriptions
     cql: |-
       MATCH (c:Category)
