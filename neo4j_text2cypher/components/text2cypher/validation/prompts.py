@@ -19,20 +19,18 @@ def create_text2cypher_validation_prompt_template() -> ChatPromptTemplate:
     You are a Cypher expert reviewing a statement written by a junior developer.
     """
 
-    validate_cypher_user = """You must check ONLY the following:
+    validate_cypher_user = """You must check the following:
     * Are there any syntax errors in the Cypher statement?
     * Are there any missing or undefined variables in the Cypher statement?
-    * Ensure that all nodes, relationships and properties used in the Cypher statement are present in the provided schema.
-    
-    DO NOT check whether the query "fully answers" the question or includes all mentioned entities.
-    ONLY validate syntax correctness and schema compliance.
+    * Does the Cypher statement include enough information to answer the question?
+    * Ensure that all nodes, relationships and properties are present in the provided schema.
 
     CRITICAL INSTRUCTIONS FOR READING THE SCHEMA:
     - When you see a node label like "**NodeLabel**" followed by properties like "`property1`: TYPE", this means the NodeLabel HAS the property 'property1'
     - Properties listed under a node label in the schema EXIST for that node type
     - DO NOT claim a property doesn't exist if it's clearly listed under the node label in the schema
     - Read the schema carefully and thoroughly before making any error claims
-    - Focus ONLY on validating that the Cypher uses valid labels, relationships, and properties from the schema
+    - If a property is listed in the schema under a node label, it EXISTS
 
     Examples of good errors:
     * Label (:Foo) does not exist, did you mean (:Bar)?

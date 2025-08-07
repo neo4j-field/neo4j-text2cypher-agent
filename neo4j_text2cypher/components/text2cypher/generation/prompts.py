@@ -37,10 +37,15 @@ Do not wrap the response in any backticks or anything else. Begin with MATCH or 
 
 IMPORTANT: Always end your query with LIMIT {result_limit} unless the question specifically asks for all results or a different number.
 
-Here is the schema information
-{{schema}}
+CRITICAL INSTRUCTIONS:
+- You MUST base your Cypher query ONLY on the example templates provided below
+- DO NOT invent or create new properties, labels, or relationships that are not in the examples
+- Use the EXACT same node labels as shown in the examples
+- Use the EXACT same property names as shown in the examples
+- Study the examples carefully and follow their exact syntax and naming conventions
+- If you cannot find a relevant example pattern, use the closest matching example
 
-Below are a number of examples of questions and their corresponding Cypher queries.
+Below are example questions and their corresponding Cypher queries. These are your ONLY reference for valid patterns:
 
 {{fewshot_examples}}
 
