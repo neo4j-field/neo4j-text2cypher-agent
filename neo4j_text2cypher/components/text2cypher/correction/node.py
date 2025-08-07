@@ -41,6 +41,7 @@ def create_text2cypher_correction_node(
         """
         Correct the Cypher statement based on the provided errors.
         """
+        print(f"\n🔧 Text2Cypher Correction: Fixing errors: {state.get('errors', [])}")
 
         corrected_cypher = await correct_cypher_chain.ainvoke(
             {

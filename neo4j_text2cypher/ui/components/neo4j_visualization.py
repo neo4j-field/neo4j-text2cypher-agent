@@ -126,8 +126,8 @@ def render_neo4j_graph_from_result(
     color_mapping = None
     unique_node_count = None
     try:
-        # Create visualization directly from Neo4j result with row limit
-        viz = from_neo4j(result, row_limit=row_limit)
+        # Create visualization from result
+        viz = from_neo4j(result)
         
         # Apply styling with custom color mapping
         if node_color_property:
@@ -205,12 +205,21 @@ def render_neo4j_graph_from_result(
                 layout_options = HierarchicalLayoutOptions(
                     direction=direction_map.get(direction, Direction.DOWN)
                 )
-                html_content = viz.render(layout=Layout.HIERARCHICAL, layout_options=layout_options)._repr_html_()
+                html_content = viz.render(
+                    layout=Layout.HIERARCHICAL, 
+                    layout_options=layout_options,
+                    max_allowed_nodes=1000  # Allow up to 1000 nodes
+                )._repr_html_()
             else:
-                html_content = viz.render(layout=Layout.HIERARCHICAL)._repr_html_()
+                html_content = viz.render(
+                    layout=Layout.HIERARCHICAL,
+                    max_allowed_nodes=1000  # Allow up to 1000 nodes
+                )._repr_html_()
         else:
             # Default force-directed layout
-            html_content = viz.render()._repr_html_()
+            html_content = viz.render(
+                max_allowed_nodes=1000  # Allow up to 1000 nodes
+            )._repr_html_()
         
         # Add CSS to hide scrollbars and ensure proper fit
         styled_content = f"""

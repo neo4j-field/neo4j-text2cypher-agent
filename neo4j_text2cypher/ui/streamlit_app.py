@@ -118,8 +118,11 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                     
                     # Step 5: Examples and Workflow
                     show_spinner(step_placeholders["workflow"], "Loading examples and creating workflow...")
-                    cypher_example_retriever = ConfigCypherExampleRetriever(
-                        config_path=str(config_loader.config_path)
+                    # Use semantic similarity retriever by default
+                    from neo4j_text2cypher.retrievers.similarity_retriever import SimilarityBasedCypherExampleRetriever
+                    cypher_example_retriever = SimilarityBasedCypherExampleRetriever(
+                        config_loader=config_loader,
+                        k=10  # Default k value
                     )
                     
                     # Create the workflow with default settings
@@ -128,9 +131,9 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                         graph=graph,
                         scope_description=streamlit_config.scope_description,
                         cypher_example_retriever=cypher_example_retriever,
-                        attempt_cypher_execution_on_final_attempt=False,
-                        break_into_subquestions=True,  # Default to enabled
-                        result_limit=50,  # Default result limit
+                        attempt_cypher_execution_on_final_attempt=True,
+                        break_into_subquestions=False,  # Default to disabled
+                        result_limit=100,  # Default result limit
                     )
                     step_placeholders["workflow"].write("✅ Workflow created")
                     
@@ -140,10 +143,10 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                     st.session_state.example_questions = streamlit_config.example_questions
                     
                     # Initialize new query processing settings
-                    st.session_state.break_into_subquestions = True  # Default to enabled
-                    st.session_state.similarity_type = "Static"  # Default to static retrieval
+                    st.session_state.break_into_subquestions = False  # Default to disabled
+                    st.session_state.similarity_type = "Semantic Similarity"  # Default to semantic retrieval
                     st.session_state.k_value = 10  # Default K value for semantic similarity
-                    st.session_state.result_limit = 50  # Default result limit
+                    st.session_state.result_limit = 100  # Default result limit
                     
                     # Store system information for UI display
                     st.session_state.model_name = llm_config.model
@@ -159,9 +162,9 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                         "cypher_example_retriever": cypher_example_retriever,
                         "scope_description": streamlit_config.scope_description,
                         "max_attempts": 3,
-                        "attempt_cypher_execution_on_final_attempt": False,
+                        "attempt_cypher_execution_on_final_attempt": True,
                         "config_loader": config_loader,  # Needed for similarity retriever
-                        "result_limit": 50,  # Default result limit
+                        "result_limit": 100,  # Default result limit
                     }
                     
                     # Application initialization complete

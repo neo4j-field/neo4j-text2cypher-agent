@@ -15,7 +15,10 @@ class Property(BaseModel):
     node_label: str = Field(
         description="The label of the node to which this property belongs."
     )
-    property_key: str = Field(description="The key of the property being filtered.")
+    property_key: Optional[str] = Field(
+        default=None,
+        description="The key of the property being filtered. Can be None if not specified."
+    )
     property_value: Optional[str] = Field(
         default=None,
         description="The value that the property is being matched against. Can be None for existence checks or when the value is not specified.",

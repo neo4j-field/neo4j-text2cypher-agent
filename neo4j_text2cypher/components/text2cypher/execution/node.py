@@ -48,6 +48,10 @@ def create_text2cypher_execution_node(
         """
         statement = state.get("statement", "")
         
+        # Print the task/question this Cypher is for
+        print(f"\n📌 Task: {state.get('task', '')}")
+        print(f"🔍 Cypher: {statement}")
+        
         # Execute query with session approachm this is get the Result object that our viz library needs to try and render
         if statement.strip():
             try:
@@ -63,6 +67,10 @@ def create_text2cypher_execution_node(
         else:
             records = []
             result_obj = None
+        
+        # Print results info
+        record_count = len(records) if records else 0
+        print(f"✅ Results: {record_count} records returned")
         
         steps = state.get("cypher_steps", list())
         steps.append("execute_cypher")

@@ -38,5 +38,8 @@ def query_mapper_edge(state: OverallState) -> List[Send]:
     """Map each task question to a Text2Cypher subgraph."""
 
     tasks = state.get("tasks", list())
+    print(f"\n🔄 Query mapper: Sending {len(tasks)} task(s) to text2cypher")
+    for i, task in enumerate(tasks):
+        print(f"   Task {i+1}: {task.question}")
     sends = [Send("text2cypher", {"task": task.question}) for task in tasks]
     return sends

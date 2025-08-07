@@ -61,6 +61,7 @@ def create_text2cypher_validation_node(
         Validates the Cypher statements and maps any property values to the database.
         """
         GENERATION_ATTEMPT: int = state.get("attempts", 0) + 1
+        print(f"\n🔍 Text2Cypher Validation: Attempt {GENERATION_ATTEMPT}/{max_attempts}")
         errors = []
         mapping_errors = []
 
@@ -93,16 +94,21 @@ def create_text2cypher_validation_node(
         # determine next node in workflow
         if (errors or mapping_errors) and GENERATION_ATTEMPT < max_attempts:
             next_action = "correct_cypher"
+            print(f"   ❌ Errors found, will correct: {errors + mapping_errors}")
         elif GENERATION_ATTEMPT < max_attempts:
             next_action = "execute_cypher"
+            print(f"   ✅ Validation passed, proceeding to execution")
         elif GENERATION_ATTEMPT == max_attempts:
             # On final attempt: execute if no errors OR if forced execution is enabled
             if not (errors or mapping_errors) or attempt_cypher_execution_on_final_attempt:
                 next_action = "execute_cypher"
+                print(f"   ⚠️ Final attempt, proceeding to execution")
             else:
                 next_action = "__end__"
+                print(f"   ❌ Max attempts reached with errors, ending")
         else:
             next_action = "__end__"
+            print(f"   ❌ Exceeded max attempts, ending")
 
         return {
             "next_action_cypher": next_action,

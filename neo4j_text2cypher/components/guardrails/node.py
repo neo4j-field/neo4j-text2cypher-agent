@@ -52,6 +52,8 @@ def create_guardrails_node(
         Decides if the question is in scope.
         """
 
+        print(f"📝 User Question: {state.get('question')}")
+
         guardrails_output: GuardrailsOutput = await guardrails_chain.ainvoke(
             {"question": state.get("question")}
         )

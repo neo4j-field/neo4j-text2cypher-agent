@@ -86,8 +86,8 @@ def sidebar() -> None:
     st.sidebar.markdown("## 🔧 Query Processing Settings")
     
     # Get current settings
-    current_break_into_subquestions = st.session_state.get("break_into_subquestions", True)
-    current_similarity_type = st.session_state.get("similarity_type", "Static")
+    current_break_into_subquestions = st.session_state.get("break_into_subquestions", False)
+    current_similarity_type = st.session_state.get("similarity_type", "Semantic Similarity")
     current_k_value = st.session_state.get("k_value", 5)
     
     # Create container for settings with proper column-based indentation
@@ -145,7 +145,7 @@ def sidebar() -> None:
         # Control with more visible indent
         limit_control_indent, limit_control_content = st.sidebar.columns([0.08, 0.92])
         with limit_control_content:
-            current_result_limit = st.session_state.get("result_limit", 50)
+            current_result_limit = st.session_state.get("result_limit", 100)
             result_limit = st.select_slider(
                 "Maximum query results",
                 options=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],

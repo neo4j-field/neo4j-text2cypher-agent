@@ -40,7 +40,7 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
     if direction_key not in st.session_state:
         st.session_state[direction_key] = "up"
     if node_limit_key not in st.session_state:
-        st.session_state[node_limit_key] = 50
+        st.session_state[node_limit_key] = 100
     
     # Create controls
     col1, col2, col3, col4 = st.columns([2, 2, 3, 5])
@@ -74,12 +74,16 @@ def visualization_controls(viz_id: str, result_obj, cypher: Dict[str, Any]) -> N
         viz_col, legend_col = st.columns([5, 1])
         
         with viz_col:
+            # Get the node limit from session state (default 100)
+            node_limit = st.session_state.get(node_limit_key, 100)
+            
             # Render with selected layout and direction
             node_labels, rel_types, color_mapping, unique_node_count = render_neo4j_graph_from_result(
                 result_obj, 
                 height=600,
                 layout=layout,
-                direction=direction if layout == "hierarchical" else None
+                direction=direction if layout == "hierarchical" else None,
+                row_limit=node_limit  # Use the configured limit
             )
         
         with legend_col:

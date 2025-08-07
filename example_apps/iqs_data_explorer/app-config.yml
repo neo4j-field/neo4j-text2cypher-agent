@@ -160,3 +160,8 @@ example_queries:
     cql: |-
       MATCH path=(c:Category)<-[r1:HAS_CATEGORY]-(p:Problem)<-[r2:HAS_PROBLEM]-(q:Question)
       RETURN c, p, q
+  - question: Show me category nodes and their descriptions
+    cql: |-
+      MATCH (c:Category)
+        RETURN c,  c.id AS category
+      show/visualize category nodes and their descriptions

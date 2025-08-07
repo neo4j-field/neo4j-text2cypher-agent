@@ -32,6 +32,7 @@ def create_text2cypher_generation_node(
         
         # Get examples based on retriever type
         question = state.get("task", "")
+        print(f"\n🔨 Text2Cypher Generation: Starting for task: {question}")
         
         if isinstance(cypher_example_retriever, SimilarityBasedCypherExampleRetriever):
             # Use similarity-based selection for better relevance
@@ -47,6 +48,8 @@ def create_text2cypher_generation_node(
                 "schema": graph.schema,
             }
         )
+        
+        print(f"   Generated Cypher: {generated_cypher}")
 
         steps = state.get("prev_steps", list()) + ["generate_cypher"]
         

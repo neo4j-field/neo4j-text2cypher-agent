@@ -92,6 +92,12 @@ def create_planner_node(
             )
         ]
         
+        task_count = len(final_tasks)
+        if task_count > 1:
+            print(f"\n🎯 Planner: Breaking into {task_count} sub-tasks")
+        else:
+            print(f"\n🎯 Planner: Processing as single task")
+        
         return {
             "tasks": final_tasks,
             "steps": ["planner"],
