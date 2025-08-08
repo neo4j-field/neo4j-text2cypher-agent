@@ -17,6 +17,13 @@ def retrieve_and_parse_schema_from_graph_for_prompts(graph: Neo4jGraph) -> str:
             get_cypher_query_node_graph_schema(), r"\2", schema, flags=re.MULTILINE
         )
     
+    # Clean up enhanced schema formatting to avoid LLM confusion
+    # Remove markdown bold markers from node labels
+    schema = re.sub(r'\*\*([^*]+)\*\*', r'\1', schema)
+    
+    # Remove backticks from property names
+    schema = re.sub(r'`([^`]+)`', r'\1', schema)
+    
     # Escape curly braces to prevent them from being treated as template variables
     # This is necessary because the basic schema format contains property definitions like {id: STRING}
     # The enhanced schema format uses backticks instead, so this only affects basic schema

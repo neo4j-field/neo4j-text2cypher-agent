@@ -114,6 +114,8 @@ class SimilarityBasedCypherExampleRetriever:
         if len(selected_examples) > num_examples:
             selected_examples = selected_examples[:num_examples]
         
+        # Debug output removed - printing happens in generation node instead
+        
         # Format examples for prompt (same format as ConfigCypherExampleRetriever)
         return self._format_examples(selected_examples)
 

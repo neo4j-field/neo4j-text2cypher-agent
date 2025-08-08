@@ -1,0 +1,38 @@
+Node properties:
+- Customer
+  - id: STRING Example: "9A79438B"
+  - ageBucket: STRING Example: ">=70"
+  - gender: STRING Available options: ['Male', 'Female', '']
+- Category
+  - id: STRING Available options: ['Exterior', 'Driving Experience', 'Features/Controls/Displays (FCD)', 'Driving Assistance', 'Infotainment', 'Seats', 'Climate', 'Interior', 'Powertrain']
+- Problem
+  - id: STRING Example: "EXT01"
+  - problem: STRING Example: "EXT01: Doors - Hard to open/close"
+- Question
+  - id: INTEGER Min: 1, Max: 223
+  - question: STRING Example: "#001 Doors Hard to Open/Close"
+- Vehicle
+  - id: STRING Example: "Acura Integra"
+  - totalProblems: INTEGER Min: 2, Max: 10
+- Verbatim
+  - id: STRING Example: "9323AB5C"
+  - verbatim: STRING Example: "It doesn't work if I have my phone in the car.  Th"
+  - verbatimText: STRING Example: "acura rdx infotainment info13: built-in navigation"
+  - ageBucket: STRING Example: "60-64"
+  - severity: FLOAT Example: "3.0"
+  - gender: STRING Example: "Female"
+  - make: STRING Example: "Acura"
+  - model: STRING Example: "RDX"
+  - minAge: INTEGER Example: "60"
+  - maxAge: INTEGER Example: "64"
+Relationship properties:
+
+The relationships:
+(:Customer)-[:SUBMITTED]->(:Verbatim)
+(:Problem)-[:HAS_CATEGORY]->(:Category)
+(:Question)-[:HAS_PROBLEM]->(:Problem)
+(:Vehicle)-[:HAS_CATEGORY]->(:Category)
+(:Vehicle)-[:HAS_VERBATIM]->(:Verbatim)
+(:Verbatim)-[:HAS_CATEGORY]->(:Category)
+(:Verbatim)-[:HAS_PROBLEM]->(:Problem)
+(:Verbatim)-[:HAS_QUESTION]->(:Question)

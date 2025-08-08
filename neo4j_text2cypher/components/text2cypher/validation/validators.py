@@ -103,7 +103,27 @@ async def validate_cypher_query_with_llm(
     errors: List[str] = []
     mapping_errors: List[str] = []
 
-    schema_for_validation = retrieve_and_parse_schema_from_graph_for_prompts(graph)
+    # Simple caching: check if cleaned schema already exists
+    from pathlib import Path
+    import os
+    database_name = os.getenv('NEO4J_DATABASE', 'neo4j')
+    cache_dir = Path("database_schema_cache")
+    cache_dir.mkdir(exist_ok=True)
+    cleaned_schema_file = cache_dir / f"{database_name}_cleaned_schema.txt"
+    
+    # Use cached schema if it exists, otherwise parse and cache it
+    if cleaned_schema_file.exists():
+        schema_for_validation = cleaned_schema_file.read_text()
+    else:
+        schema_for_validation = retrieve_and_parse_schema_from_graph_for_prompts(graph)
+        cleaned_schema_file.write_text(schema_for_validation)
+        print(f"   📝 Cleaned schema written to: {cleaned_schema_file}")
+
+    # Debug: Print validation prompt details
+    print(f"\n🔍 Validation Prompt Details:")
+    print(f"   Question: {question}")
+    print(f"   Cypher to validate: {cypher_statement}")
+    print(f"   Schema length: {len(schema_for_validation)} characters")
 
     llm_output: ValidateCypherOutput = await validate_cypher_chain.ainvoke(
         {

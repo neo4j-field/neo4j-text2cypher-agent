@@ -12,6 +12,9 @@ from neo4j_text2cypher.components.text2cypher.correction.prompts import (
     create_text2cypher_correction_prompt_template,
 )
 from neo4j_text2cypher.components.text2cypher.state import CypherState
+from neo4j_text2cypher.utils.schema_utils import (
+    retrieve_and_parse_schema_from_graph_for_prompts,
+)
 
 correction_cypher_prompt = create_text2cypher_correction_prompt_template()
 
@@ -43,12 +46,15 @@ def create_text2cypher_correction_node(
         """
         print(f"\n🔧 Text2Cypher Correction: Fixing errors: {state.get('errors', [])}")
 
+        # Use cleaned schema for correction (same as validation)
+        cleaned_schema = retrieve_and_parse_schema_from_graph_for_prompts(graph)
+        
         corrected_cypher = await correct_cypher_chain.ainvoke(
             {
                 "question": state.get("task"),
                 "errors": state.get("errors"),
                 "cypher": state.get("statement"),
-                "schema": graph.schema,
+                "schema": cleaned_schema,
             }
         )
 

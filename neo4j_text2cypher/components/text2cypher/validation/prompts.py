@@ -24,13 +24,43 @@ def create_text2cypher_validation_prompt_template() -> ChatPromptTemplate:
     * Are there any missing or undefined variables in the Cypher statement?
     * Does the Cypher statement include enough information to answer the question?
     * Ensure that all nodes, relationships and properties are present in the provided schema.
+    
+    IMPORTANT: Be VERY careful when checking properties - many false errors are reported when properties actually exist!
+    
+    SPECIAL VALIDATION RULES:
+    - String literals in WHERE clauses or functions are NOT label names - they are just string values
+    - When you see patterns like tolower(x) = tolower("some_string"), the "some_string" is a string value, not a label
+    - Only validate actual label references like (:LabelName) or n:LabelName against the schema
+    - String values being compared or processed should NOT be validated as labels
+    - Dynamic label checking (e.g., using labels(n) function) is for runtime matching, not compile-time validation
 
     CRITICAL INSTRUCTIONS FOR READING THE SCHEMA:
-    - When you see a node label like "**NodeLabel**" followed by properties like "`property1`: TYPE", this means the NodeLabel HAS the property 'property1'
-    - Properties listed under a node label in the schema EXIST for that node type
-    - DO NOT claim a property doesn't exist if it's clearly listed under the node label in the schema
-    - Read the schema carefully and thoroughly before making any error claims
-    - If a property is listed in the schema under a node label, it EXISTS
+    - The schema follows a hierarchical structure:
+      * Node labels appear as "- LabelName" (dash followed by the label name)
+      * Properties appear indented under their node label as "  - propertyName: TYPE"
+      * The indentation shows which properties belong to which node label
+    - When validating labels: Look for exact matches in lines starting with "- " under "Node properties:"
+    - When validating properties: Check the indented items under the corresponding node label
+    - Labels and properties are CASE SENSITIVE - they must match EXACTLY as shown in the schema
+    - DO NOT modify or "correct" label names - if a label uses underscores, mixed case, or specific spelling, use it exactly
+    - DO NOT suggest similar-looking labels - only report if a label truly doesn't exist
+    - Read the ENTIRE schema before claiming something is missing
+    
+    Schema Structure Example (generic):
+    - NodeLabelA           <- This line defines a node label
+      - property1: TYPE    <- These indented lines are properties of NodeLabelA
+      - property2: TYPE    <- NodeLabelA.property2 EXISTS
+    - NodeLabelB           <- This is a different node label
+      - property3: TYPE    <- This property belongs to NodeLabelB
+      
+    To check if a property exists:
+    1. Find the node label line (starts with "- ")
+    2. Look at ALL indented properties below it
+    3. If you see "  - propertyName:" under a node, that property EXISTS for that node
+    4. NEVER report "Property 'x' does not exist" if you can find "  - x:" under the node label
+    
+    Relationships appear under "The relationships:" section in format:
+    (:NodeA)-[:RELATIONSHIP_TYPE]->(:NodeB)
 
     Examples of good errors:
     * Label (:Foo) does not exist, did you mean (:Bar)?

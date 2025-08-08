@@ -32,20 +32,31 @@ def create_text2cypher_generation_node(
         
         # Get examples based on retriever type
         question = state.get("task", "")
-        print(f"\n🔨 Text2Cypher Generation: Starting for task: {question}")
         
         if isinstance(cypher_example_retriever, SimilarityBasedCypherExampleRetriever):
             # Use similarity-based selection for better relevance
             examples: str = cypher_example_retriever.get_relevant_examples(question, k=5)
+            # Count actual examples in the returned string
+            example_count = examples.count("Question:")
+            print(f"\n📚 Semantic Similarity Retriever for '{question}' - Retrieved {example_count} examples:")
+            print("=" * 80)
+            print(examples)
+            print("=" * 80)
         else:
             # Fallback to original config-based approach
             examples: str = cypher_example_retriever.get_examples()
+            print(f"\n📚 Config-based Retriever - Using all configured examples")
+
+        # Print the full prompt being sent to the LLM
+        print(f"\n🔍 Generation Prompt Details:")
+        print(f"   Question: {question}")
+        print(f"   Examples length: {len(examples)} characters")
+        print(f"   Note: Generation uses only examples, not schema (as of commit eedfcda)")
 
         generated_cypher = await text2cypher_chain.ainvoke(
             {
                 "question": question,
                 "fewshot_examples": examples,
-                "schema": graph.schema,
             }
         )
         

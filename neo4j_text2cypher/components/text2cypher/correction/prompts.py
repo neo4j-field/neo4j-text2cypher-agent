@@ -29,6 +29,29 @@ def create_text2cypher_correction_prompt_template() -> ChatPromptTemplate:
                 (
                     """Check for invalid syntax or semantics and return a corrected Cypher statement.
 
+    IMPORTANT: Be VERY careful when checking the schema - the errors you received might be incorrect!
+    
+    SPECIAL VALIDATION RULES (ignore errors about these):
+    - String literals in WHERE clauses or functions are NOT label names - they are just string values
+    - When you see patterns like tolower(x) = tolower("some_string"), the "some_string" is a string value, not a label
+    - Only actual label references like (:LabelName) or n:LabelName need to match the schema
+    - String values being compared or processed should NOT be changed to match schema labels
+    - Dynamic label checking (e.g., using labels(n) function) is for runtime matching - keep the original strings
+    
+    CRITICAL INSTRUCTIONS FOR READING THE SCHEMA:
+    - The schema follows a hierarchical structure:
+      * Node labels appear as "- LabelName" (dash followed by the label name)
+      * Properties appear indented under their node label as "  - propertyName: TYPE"
+    - Labels and properties are CASE SENSITIVE - use them EXACTLY as shown in the schema
+    - DO NOT modify or "correct" label names - if the error says a label doesn't exist, check the schema for the exact spelling
+    - When correcting based on errors, ensure you're using the exact label/property names from the schema
+    
+    To verify if a property exists before "correcting" it:
+    1. Find the node label line (starts with "- ")
+    2. Look at ALL indented properties below it
+    3. If you see "  - propertyName:" under a node, that property EXISTS for that node
+    4. If the error says "Property 'x' does not exist" but you find "  - x:" under the node, IGNORE that error - the property DOES exist
+
     Schema:
     {schema}
 
