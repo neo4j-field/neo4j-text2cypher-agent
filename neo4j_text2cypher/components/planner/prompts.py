@@ -48,3 +48,49 @@ question: {question}
             ),
         ]
     )
+
+
+def create_passthrough_prompt_template() -> ChatPromptTemplate:
+    """
+    Create a prompt for passthrough mode that resolves references but returns a single task.
+    
+    This is used when break_into_subquestions=False to ensure questions with
+    ambiguous references are clarified using conversation history.
+    
+    Returns
+    -------
+    ChatPromptTemplate
+        The prompt template for reference resolution in passthrough mode.
+    """
+    passthrough_system = """
+You are a query processor that clarifies questions using conversation history.
+Your job is to take the user's question and resolve any ambiguous references using the conversation history provided.
+
+IMPORTANT RULES:
+1. You must return exactly ONE task with the clarified question
+2. If the question has no ambiguous references, return it unchanged
+3. If it contains references (like "those", "them", "it", "that", "their", "these") that can be resolved from conversation history, replace them with specific terms
+4. The task's parent_task should always be the original question
+
+Example:
+- Conversation history: "Q: Show me all customers from California  A: [list of California customers]"
+- Current question: "What are their orders?"
+- Output: Single task with question "What are the orders for customers from California?"
+"""
+
+    message = """{conversation_history}
+
+Current question: {question}"""
+
+    return ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                passthrough_system,
+            ),
+            (
+                "human",
+                message,
+            ),
+        ]
+    )

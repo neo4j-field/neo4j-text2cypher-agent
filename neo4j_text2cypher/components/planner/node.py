@@ -5,7 +5,10 @@ from langchain_core.runnables.base import Runnable
 
 from neo4j_text2cypher.components.models import Task
 from neo4j_text2cypher.components.planner.models import PlannerOutput
-from neo4j_text2cypher.components.planner.prompts import create_planner_prompt_template
+from neo4j_text2cypher.components.planner.prompts import (
+    create_planner_prompt_template,
+    create_passthrough_prompt_template,
+)
 from neo4j_text2cypher.components.state import InputState
 
 def format_conversation_history(history: List[Dict[str, Any]]) -> str:
@@ -52,7 +55,12 @@ def create_planner_node(
         The LangGraph node.
     """
 
-    planner_prompt = create_planner_prompt_template()
+    # Select appropriate prompt based on mode
+    if break_into_subquestions:
+        planner_prompt = create_planner_prompt_template()
+    else:
+        planner_prompt = create_passthrough_prompt_template()
+    
     planner_chain: Runnable[Dict[str, Any], Any] = (
         planner_prompt
         | llm.with_structured_output(PlannerOutput, method="function_calling")
@@ -63,28 +71,23 @@ def create_planner_node(
         Break user query into chunks, if appropriate.
         """
 
-        if break_into_subquestions:
-            # Use AI to break down the question into multiple tasks
-            history = state.get("history", [])
-            conversation_history = format_conversation_history(history)
+        # Get conversation history for both modes
+        history = state.get("history", [])
+        conversation_history = format_conversation_history(history)
+        question = state.get("question", "")
 
-            planner_output: PlannerOutput = await planner_chain.ainvoke(
-                {
-                    "question": state.get("question", ""),
-                    "conversation_history": conversation_history,
-                }
-            )
-
-        else:
-            # Passthrough mode: directly create a single task with the original question
-            # No AI needed - deterministic and reliable
-            original_question = state.get("question", "")
-            planner_output = PlannerOutput(tasks=[
-                Task(
-                    question=original_question,
-                    parent_task=original_question,
-                )
-            ])
+        # Use planner chain for both modes (different prompts handle the behavior)
+        planner_output: PlannerOutput = await planner_chain.ainvoke(
+            {
+                "question": question,
+                "conversation_history": conversation_history,
+            }
+        )
+        
+        # Ensure passthrough mode only returns one task
+        if not break_into_subquestions and planner_output.tasks and len(planner_output.tasks) > 1:
+            # Safety check: if passthrough mode somehow returns multiple tasks, take only the first
+            planner_output.tasks = planner_output.tasks[:1]
         final_tasks = planner_output.tasks or [
             Task(
                 question=state.get("question", ""),

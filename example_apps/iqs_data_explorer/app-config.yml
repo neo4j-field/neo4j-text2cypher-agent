@@ -23,6 +23,7 @@ streamlit_ui:
     - "Visualize feedback paths from customers for acura make, list their categories and summarize the feedback about doors"
     - "Summarize the responses under fcd10 for honda pilot. What is the men to women proportion for these responses and what is the problem for fcd10?"
     - "What are the top 5 most severe problems for women aged 30-34 for all Acura models?"
+    - "Please summarize the verbatims for 2023 RDX for question 010 Trunk/TG Touch-Free Sensor DTU and create 5 categories for the problems. As an output, I want a list of verbatims and the corresponding categories"
 
 example_queries:
   - question: What is the proportion of male to female complainants about cup holders in the Honda Odyssey?
