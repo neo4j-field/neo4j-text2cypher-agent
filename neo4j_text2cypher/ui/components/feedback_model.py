@@ -2,6 +2,8 @@
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
+import os
+from pathlib import Path
 
 # Replace these connection details for Azure, will move to .env file in future
 
@@ -14,9 +16,16 @@ from datetime import datetime
 #     "your-connection-string"
 # )
 
-# Local SQLite for testing (use forward slashes for cross-platform compatibility)
-connection_string = "sqlite:///C:/Users/Yancarlo Perez/Documents/feedback.db"
-print(f"Using SQLite database at: {connection_string}")
+# Local SQLite for testing - use project-relative path
+# Create feedback data directory inside ui/components if it doesn't exist
+current_dir = Path(__file__).parent  # ui/components directory
+feedback_data_dir = current_dir / "feedback_data_store"
+feedback_data_dir.mkdir(exist_ok=True)
+
+# Database file path
+db_path = feedback_data_dir / "feedback.db"
+connection_string = f"sqlite:///{db_path}"
+print(f"Using SQLite database at: {db_path}")
 
 engine = create_engine(connection_string, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
