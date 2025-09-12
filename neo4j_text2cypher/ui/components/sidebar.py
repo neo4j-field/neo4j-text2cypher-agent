@@ -83,88 +83,101 @@ def sidebar() -> None:
         st.sidebar.divider()
 
     # 2. Query Processing Settings (controls that change behavior)
-    st.sidebar.markdown("## 🔧 Query Processing Settings")
-    
-    # Get current settings
-    current_break_into_subquestions = st.session_state.get("break_into_subquestions", False)
-    current_similarity_type = st.session_state.get("similarity_type", "Semantic Similarity")
-    current_k_value = st.session_state.get("k_value", 5)
-    
-    # Create container for settings with proper column-based indentation
-    with st.sidebar.container():
-        # Planner Behaviour section with minimal indent
-        planner_indent, planner_content = st.sidebar.columns([0.03, 0.97])
-        with planner_content:
-            st.markdown("#### 🧠 Planner Behaviour")
+    # Only show if configured to be visible
+    if st.session_state.get("show_query_processing", True):
+        st.sidebar.markdown("## 🔧 Query Processing Settings")
         
-        # Control with more visible indent
-        planner_control_indent, planner_control_content = st.sidebar.columns([0.08, 0.92])
-        with planner_control_content:
-            break_into_subquestions_option = st.radio(
-                "Break questions into subquestions",
-                options=["Enabled", "Disabled"],
-                index=0 if current_break_into_subquestions else 1,
-                help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is.",
-                horizontal=True  # Make radio buttons horizontal to save space and look cleaner
-            )
-            break_into_subquestions = (break_into_subquestions_option == "Enabled")
+        # Get current settings
+        current_break_into_subquestions = st.session_state.get("break_into_subquestions", False)
+        current_similarity_type = st.session_state.get("similarity_type", "Semantic Similarity")
+        current_k_value = st.session_state.get("k_value", 5)
         
-        # Cypher Retriever Strategy section with minimal indent
-        retriever_indent, retriever_content = st.sidebar.columns([0.03, 0.97])
-        with retriever_content:
-            st.markdown("#### 🔍 Cypher Retriever Strategy")
+        # Get editable flags
+        planner_editable = st.session_state.get("planner_editable", True)
+        retriever_editable = st.session_state.get("retriever_editable", True)
+        result_limit_editable = st.session_state.get("result_limit_editable", True)
         
-        # Control with more visible indent
-        retriever_control_indent, retriever_control_content = st.sidebar.columns([0.08, 0.92])
-        with retriever_control_content:
-            similarity_type = st.radio(
-                "Select retriever strategy",
-                options=["Static", "Semantic Similarity"],
-                index=0 if current_similarity_type == "Static" else 1,
-                help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
-                horizontal=True  # Make radio buttons horizontal for consistency
-            )
+        # Create container for settings with proper column-based indentation
+        with st.sidebar.container():
+            # Planner Behaviour section with minimal indent
+            planner_indent, planner_content = st.sidebar.columns([0.03, 0.97])
+            with planner_content:
+                st.markdown("#### 🧠 Planner Behaviour")
             
-            # K Value slider (only show when semantic similarity is selected)
-            if similarity_type == "Semantic Similarity":
-                k_value = st.slider(
-                    "Number of examples",
-                    min_value=1,
-                    max_value=20,
-                    value=10 if current_k_value == 5 else current_k_value,
-                    help="Number of most similar examples to retrieve for query generation"
+            # Control with more visible indent
+            planner_control_indent, planner_control_content = st.sidebar.columns([0.08, 0.92])
+            with planner_control_content:
+                break_into_subquestions_option = st.radio(
+                    "Break questions into subquestions",
+                    options=["Enabled", "Disabled"],
+                    index=0 if current_break_into_subquestions else 1,
+                    help="When enabled, complex questions are broken down into smaller sub-questions for better accuracy. When disabled, questions are processed as-is.",
+                    horizontal=True,  # Make radio buttons horizontal to save space and look cleaner
+                    disabled=not planner_editable
                 )
-            else:
-                k_value = current_k_value  # Keep current value when not using semantic similarity
+                break_into_subquestions = (break_into_subquestions_option == "Enabled")
+            
+            # Cypher Retriever Strategy section with minimal indent
+            retriever_indent, retriever_content = st.sidebar.columns([0.03, 0.97])
+            with retriever_content:
+                st.markdown("#### 🔍 Cypher Retriever Strategy")
+            
+            # Control with more visible indent
+            retriever_control_indent, retriever_control_content = st.sidebar.columns([0.08, 0.92])
+            with retriever_control_content:
+                similarity_type = st.radio(
+                    "Select retriever strategy",
+                    options=["Static", "Semantic Similarity"],
+                    index=0 if current_similarity_type == "Static" else 1,
+                    help="Static: Uses all configured examples for maximum context. Semantic Similarity: Selects most relevant examples based on question similarity.",
+                    horizontal=True,  # Make radio buttons horizontal for consistency
+                    disabled=not retriever_editable
+                )
+                
+                # K Value slider (only show when semantic similarity is selected)
+                if similarity_type == "Semantic Similarity":
+                    k_min = st.session_state.get("k_min", 1)
+                    k_max = st.session_state.get("k_max", 20)
+                    k_value = st.slider(
+                        "Number of examples",
+                        min_value=k_min,
+                        max_value=k_max,
+                        value=current_k_value,
+                        help="Number of most similar examples to retrieve for query generation",
+                        disabled=not retriever_editable
+                    )
+                else:
+                    k_value = current_k_value  # Keep current value when not using semantic similarity
+            
+            # Query Result Limit section with minimal indent
+            limit_indent, limit_content = st.sidebar.columns([0.03, 0.97])
+            with limit_content:
+                st.markdown("#### 🔢 Query Result Limit")
+            
+            # Control with more visible indent
+            limit_control_indent, limit_control_content = st.sidebar.columns([0.08, 0.92])
+            with limit_control_content:
+                current_result_limit = st.session_state.get("result_limit", 100)
+                result_limit_options = st.session_state.get("result_limit_options", [10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
+                result_limit = st.select_slider(
+                    "Maximum query results",
+                    options=result_limit_options,
+                    value=current_result_limit,
+                    help="Limit the number of rows returned by queries",
+                    disabled=not result_limit_editable
+                )
         
-        # Query Result Limit section with minimal indent
-        limit_indent, limit_content = st.sidebar.columns([0.03, 0.97])
-        with limit_content:
-            st.markdown("#### 🔢 Query Result Limit")
+        # If any setting changed AND is editable, recreate workflow
+        settings_changed = (
+            (planner_editable and break_into_subquestions != current_break_into_subquestions) or
+            (retriever_editable and (similarity_type != current_similarity_type or k_value != current_k_value)) or
+            (result_limit_editable and result_limit != current_result_limit)
+        )
         
-        # Control with more visible indent
-        limit_control_indent, limit_control_content = st.sidebar.columns([0.08, 0.92])
-        with limit_control_content:
-            current_result_limit = st.session_state.get("result_limit", 100)
-            result_limit = st.select_slider(
-                "Maximum query results",
-                options=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-                value=current_result_limit,
-                help="Limit the number of rows returned by queries"
-            )
-    
-    # If any setting changed, recreate workflow
-    settings_changed = (
-        break_into_subquestions != current_break_into_subquestions or
-        similarity_type != current_similarity_type or
-        k_value != current_k_value or
-        result_limit != current_result_limit
-    )
-    
-    if settings_changed and st.session_state.get("workflow_components"):
-        _recreate_workflow_with_new_settings(break_into_subquestions, similarity_type, k_value, result_limit)
-    
-    st.sidebar.divider()
+        if settings_changed and st.session_state.get("workflow_components"):
+            _recreate_workflow_with_new_settings(break_into_subquestions, similarity_type, k_value, result_limit)
+        
+        st.sidebar.divider()
 
     # 3. System Information (informational status)
     st.sidebar.markdown("## ⚙️ System Information")

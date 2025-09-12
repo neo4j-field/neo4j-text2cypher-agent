@@ -118,22 +118,30 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                     
                     # Step 5: Examples and Workflow
                     show_spinner(step_placeholders["workflow"], "Loading examples and creating workflow...")
-                    # Use semantic similarity retriever by default
-                    from neo4j_text2cypher.retrievers.similarity_retriever import SimilarityBasedCypherExampleRetriever
-                    cypher_example_retriever = SimilarityBasedCypherExampleRetriever(
-                        config_loader=config_loader,
-                        k=10  # Default k value
-                    )
+                    # Get sidebar query processing configuration
+                    sidebar_config = streamlit_config.sidebar_query_processing
                     
-                    # Create the workflow with default settings
+                    # Create retriever based on configuration
+                    if sidebar_config.retriever_strategy.type == "semantic_similarity":
+                        from neo4j_text2cypher.retrievers.similarity_retriever import SimilarityBasedCypherExampleRetriever
+                        cypher_example_retriever = SimilarityBasedCypherExampleRetriever(
+                            config_loader=config_loader,
+                            k=sidebar_config.retriever_strategy.k_value
+                        )
+                    else:  # static
+                        cypher_example_retriever = ConfigCypherExampleRetriever(
+                            config_path=str(config_loader.config_path)
+                        )
+                    
+                    # Create the workflow with configuration settings
                     agent = create_neo4j_text2cypher_workflow(
                         llm=llm,
                         graph=graph,
                         scope_description=streamlit_config.scope_description,
                         cypher_example_retriever=cypher_example_retriever,
                         attempt_cypher_execution_on_final_attempt=True,
-                        break_into_subquestions=False,  # Default to disabled
-                        result_limit=100,  # Default result limit
+                        break_into_subquestions=sidebar_config.planner_behaviour.break_into_subquestions,
+                        result_limit=sidebar_config.result_limit.default,
                     )
                     step_placeholders["workflow"].write("✅ Workflow created")
                     
@@ -142,11 +150,24 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                     st.session_state.messages = []
                     st.session_state.example_questions = streamlit_config.example_questions
                     
-                    # Initialize new query processing settings
-                    st.session_state.break_into_subquestions = False  # Default to disabled
-                    st.session_state.similarity_type = "Semantic Similarity"  # Default to semantic retrieval
-                    st.session_state.k_value = 10  # Default K value for semantic similarity
-                    st.session_state.result_limit = 100  # Default result limit
+                    # Initialize query processing settings from configuration
+                    st.session_state.break_into_subquestions = sidebar_config.planner_behaviour.break_into_subquestions
+                    st.session_state.similarity_type = "Semantic Similarity" if sidebar_config.retriever_strategy.type == "semantic_similarity" else "Static"
+                    st.session_state.k_value = sidebar_config.retriever_strategy.k_value
+                    st.session_state.result_limit = sidebar_config.result_limit.default
+                    
+                    # Store visibility flag
+                    st.session_state.show_query_processing = sidebar_config.show_in_sidebar
+                    
+                    # Store editable flags
+                    st.session_state.planner_editable = sidebar_config.planner_behaviour.user_editable
+                    st.session_state.retriever_editable = sidebar_config.retriever_strategy.user_editable
+                    st.session_state.result_limit_editable = sidebar_config.result_limit.user_editable
+                    
+                    # Store configuration ranges
+                    st.session_state.k_min = sidebar_config.retriever_strategy.k_min
+                    st.session_state.k_max = sidebar_config.retriever_strategy.k_max
+                    st.session_state.result_limit_options = sidebar_config.result_limit.options
                     
                     # Store system information for UI display
                     st.session_state.model_name = llm_config.model
@@ -164,7 +185,7 @@ def initialize_state(config_loader: ConfigLoader) -> None:
                         "max_attempts": 3,
                         "attempt_cypher_execution_on_final_attempt": True,
                         "config_loader": config_loader,  # Needed for similarity retriever
-                        "result_limit": 100,  # Default result limit
+                        "result_limit": sidebar_config.result_limit.default,
                     }
                     
                     # Application initialization complete

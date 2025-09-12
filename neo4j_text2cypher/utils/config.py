@@ -18,6 +18,82 @@ class Neo4jConfig(BaseModel):
     enhanced_schema: bool = Field(default=True, description="Enable enhanced schema")
 
 
+class PlannerBehaviourConfig(BaseModel):
+    """Configuration for planner behaviour in query processing."""
+    
+    break_into_subquestions: bool = Field(
+        default=False,
+        description="Whether to break complex questions into subquestions"
+    )
+    user_editable: bool = Field(
+        default=True,
+        description="Whether users can modify this setting in the UI"
+    )
+
+
+class RetrieverStrategyConfig(BaseModel):
+    """Configuration for retriever strategy in query processing."""
+    
+    type: str = Field(
+        default="semantic_similarity",
+        description="Retriever type: 'semantic_similarity' or 'static'"
+    )
+    k_value: int = Field(
+        default=10,
+        description="Number of examples to retrieve for semantic similarity"
+    )
+    k_min: int = Field(
+        default=1,
+        description="Minimum k value for semantic similarity slider"
+    )
+    k_max: int = Field(
+        default=20,
+        description="Maximum k value for semantic similarity slider"
+    )
+    user_editable: bool = Field(
+        default=True,
+        description="Whether users can modify this setting in the UI"
+    )
+
+
+class ResultLimitConfig(BaseModel):
+    """Configuration for query result limits."""
+    
+    default: int = Field(
+        default=100,
+        description="Default maximum number of query results"
+    )
+    options: List[int] = Field(
+        default=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        description="Available options for result limit"
+    )
+    user_editable: bool = Field(
+        default=True,
+        description="Whether users can modify this setting in the UI"
+    )
+
+
+class SidebarQueryProcessingConfig(BaseModel):
+    """Configuration for sidebar query processing settings."""
+    
+    show_in_sidebar: bool = Field(
+        default=True,
+        description="Whether to show query processing settings in the sidebar"
+    )
+    planner_behaviour: PlannerBehaviourConfig = Field(
+        default_factory=PlannerBehaviourConfig,
+        description="Planner behaviour configuration"
+    )
+    retriever_strategy: RetrieverStrategyConfig = Field(
+        default_factory=RetrieverStrategyConfig,
+        description="Retriever strategy configuration"
+    )
+    result_limit: ResultLimitConfig = Field(
+        default_factory=ResultLimitConfig,
+        description="Result limit configuration"
+    )
+
+
 class StreamlitUIConfig(BaseModel):
     """Streamlit UI configuration."""
 
@@ -25,6 +101,10 @@ class StreamlitUIConfig(BaseModel):
     scope_description: str = Field(description="Description of what the app can answer")
     example_questions: List[str] = Field(
         default=[], description="Example questions for the UI"
+    )
+    sidebar_query_processing: SidebarQueryProcessingConfig = Field(
+        default_factory=SidebarQueryProcessingConfig,
+        description="Query processing settings for the sidebar"
     )
 
 

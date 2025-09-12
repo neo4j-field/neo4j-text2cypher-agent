@@ -24,6 +24,23 @@ streamlit_ui:
     - "Summarize the responses under fcd10 for honda pilot. What is the men to women proportion for these responses and what is the problem for fcd10?"
     - "What are the top 5 most severe problems for women aged 30-34 for all Acura models?"
     - "Please summarize the verbatims for 2023 RDX for question 010 Trunk/TG Touch-Free Sensor DTU and create 5 categories for the problems. As an output, I want a list of verbatims and the corresponding categories"
+  
+  # Query processing settings for the sidebar (optional - uses defaults if not specified)
+  sidebar_query_processing:
+    show_in_sidebar: true  # Set to false to hide the entire query processing section
+    planner_behaviour:
+      break_into_subquestions: false  # Default: false (passthrough mode)
+      user_editable: false # Allow users to modify via UI
+    retriever_strategy:
+      type: "semantic_similarity"  # Options: "semantic_similarity" or "static"
+      k_value: 10  # Number of examples for semantic similarity
+      k_min: 1  # Minimum k value for slider
+      k_max: 20  # Maximum k value for slider
+      user_editable: false  # Allow users to modify via UI
+    result_limit:
+      default: 50  # Default maximum query results
+      options: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]  # Available options
+      user_editable: false  # Allow users to modify via UI
 
 example_queries:
   - question: What is the proportion of male to female complainants about cup holders in the Honda Odyssey?
