@@ -5,6 +5,18 @@ import pandas as pd
 import streamlit as st
 from langgraph.errors import GraphRecursionError
 from neo4j.exceptions import SessionExpired
+from neo4j_text2cypher.ui.components.feedback_utils import save_feedback
+
+# Feedback reason options - edit here to change dropdown options
+FEEDBACK_REASON_OPTIONS = [
+    "Select a reason...",
+    "Incorrect Results",
+    "Invalid Cypher",
+    "Incomplete Response",
+    "Performance Issue",
+    "Misunderstood Question"
+]
+
 
 from neo4j_text2cypher.components.state import (
     CypherHistoryRecord,
@@ -412,6 +424,8 @@ async def append_llm_response(question: str) -> None:
                     {"question": question, "data": [], "history": history},
                     config={"recursion_limit": 30},
                 )
+                # Add the question to the response for feedback tracking
+                response["question"] = question
 
                 # Clear thinking status and show response
                 thinking_placeholder.empty()
@@ -419,6 +433,9 @@ async def append_llm_response(question: str) -> None:
                     with st.expander("Response", expanded=True):
                         # Show the answer text
                         st.markdown(response.get("answer", ""))
+                        
+                        # Add feedback widget for the current response
+                        render_feedback_widget(response)
                         
                         # Show response details if there are cyphers
                         show_cypher_response_information(response=response, is_latest_response=True)
@@ -495,19 +512,114 @@ async def chat(question: str) -> None:
         st.error(f"Neo4j Session expired. Please restart the application. Error: {e}")
 
 
+def display_message_with_feedback(message: dict, index: int) -> None:
+    role = message["role"]
+    content = message["content"]
+    with st.chat_message(role):
+        if role == "user":
+            st.markdown(content)
+        else:
+            # Show assistant response with feedback buttons
+            with st.expander("Response", expanded=True):
+                st.markdown(content.get("answer", ""))
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button(f"👍", key=f"up_{index}"):
+                        _save_feedback_ui(content, "correct")
+                with col2:
+                    if st.button(f"👎", key=f"down_{index}"):
+                        _save_feedback_ui(content, "incorrect")
+                #show_cypher_response_information(response=content)
+
+
 def display_chat_history() -> None:
-    for message in st.session_state.get("messages", []):
+    messages = st.session_state.get("messages", [])
+    for i, message in enumerate(messages):
         with st.chat_message(message["role"]):
             if message.get("role") == "user":
                 st.markdown(message.get("content"))
             else:
-                # Create main chatbot response section for chat history
                 response_content = message["content"]
+                # Check if this is the latest message
+                is_latest = (i == len(messages) - 1)
+                
                 with st.expander("Response", expanded=True):
-                    # Show the answer text
                     st.markdown(response_content.get("answer", ""))
                     
-                    # Show response details if there are cyphers
+                    # Only show feedback widget for the latest message
+                    if is_latest:
+                        render_feedback_widget(response_content)
+                    else:
+                        # For historical messages, just show if feedback was submitted
+                        response_id = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
+                        if st.session_state.get(f"feedback_saved_{response_id}"):
+                            st.markdown("---")
+                            st.success("✅ Feedback submitted")
+                    
                     show_cypher_response_information(response=response_content)
+
+def render_feedback_widget(response_content: dict) -> None:
+    """
+    Renders the feedback widget for a response. 
+    This is used in both append_llm_response and display_chat_history to avoid duplication.
+    """
+    st.markdown("---")
+    
+    # Use a unique ID for this response
+    response_id = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
+    
+    if st.session_state.get(f"feedback_saved_{response_id}"):
+        st.success("✅ Feedback submitted")
+    else:
+        st.markdown("**Was this response helpful?**")
+        
+        # Store response in session state
+        if f"response_{response_id}" not in st.session_state:
+            st.session_state[f"response_{response_id}"] = response_content
+        
+        # Display feedback widget
+        feedback_value = st.feedback(
+            "thumbs", 
+            key=f"feedback_{response_id}"
+        )
+        
+        # Check feedback value
+        if feedback_value == 1:
+            # Thumbs up - save immediately
+            _save_feedback_ui(response_content, "correct", None, response_id)
+            st.rerun()
+        elif feedback_value == 0:
+            # Thumbs down - show reason dropdown
+            st.markdown("**Please select a reason:**")
+            
+            reason = st.selectbox(
+                "Feedback reason",
+                FEEDBACK_REASON_OPTIONS,
+                key=f"reason_select_{response_id}",
+                label_visibility="collapsed"
+            )
+            
+            # Auto-submit when a reason is selected
+            if reason != "Select a reason...":
+                _save_feedback_ui(response_content, "incorrect", reason, response_id)
+                st.rerun()
+
+
+def _save_feedback_ui(response_content: dict, validation: str, reason: str = None, response_id: str = None) -> None:
+    question = response_content.get("question", "")
+    # Handle both single cypher and multiple cyphers
+    cypher_stmt = ""
+    if response_content.get("cyphers") and len(response_content.get("cyphers", [])) > 0:
+        # Get the first cypher statement if there are multiple
+        cypher_stmt = response_content.get("cyphers", [{}])[0].get("statement", "")
+    elif response_content.get("cypher"):
+        cypher_stmt = response_content.get("cypher", {}).get("statement", "")
+    response_text = response_content.get("answer", "")
+    save_feedback(question, cypher_stmt, response_text, validation, reason)
+    # Store feedback status using the response_id 
+    if response_id:
+        st.session_state[f"feedback_saved_{response_id}"] = True
+
+
 
 
