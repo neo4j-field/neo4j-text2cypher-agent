@@ -192,3 +192,5 @@ yworks/.streamlit/
 # Temporary test files
 test_neo4j_records.py
 neo4j_text2cypher/ui/components/feedback_data_store/feedback.db
+CLAUDE.md
+history_fix/

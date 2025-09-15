@@ -64,20 +64,18 @@ def create_summarization_node(
         Summarize results of the performed Cypher queries.
         """
 
-        # Separate visualization and non-visualization queries
+        # Get all cypher results for summarization
         all_cyphers = state.get("cyphers", list())
-        viz_cyphers = [c for c in all_cyphers if c.get("visualization_requested", False)]
-        regular_cyphers = [c for c in all_cyphers if not c.get("visualization_requested", False)]
-        
-        # Get results only from non-visualization queries for summarization
+
+        # Get results from all queries for summarization
         results_to_summarize = [
             cypher.get("records")
-            for cypher in regular_cyphers
+            for cypher in all_cyphers
             if cypher.get("records") is not None
         ]
 
         if results_to_summarize:
-            # Summarize non-visualization results
+            # Summarize results
             history = state.get("history", [])
             conversation_history = format_conversation_history_for_summary(history)
 
@@ -88,10 +86,6 @@ def create_summarization_node(
                     "conversation_history": conversation_history,
                 }
             )
-            
-        elif viz_cyphers:
-            # Only visualization queries - use generic message
-            summary = "Visualization data prepared successfully."
         else:
             summary = "No data to summarize."
 
