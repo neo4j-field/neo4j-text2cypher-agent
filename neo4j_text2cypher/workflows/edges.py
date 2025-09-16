@@ -38,8 +38,28 @@ def query_mapper_edge(state: OverallState) -> List[Send]:
     """Map each task question to a Text2Cypher subgraph."""
 
     tasks = state.get("tasks", list())
+    history = state.get("history", [])  # Get conversation history
+
+    # Extract recent SUCCESSFUL Cypher queries (check both statement AND records)
+    recent_cyphers = []
+    for record in history:  # Use all history (max 5 conversations as per SIZE config)
+        for cypher in record.get("cyphers", []):
+            # Only include successful queries with actual results
+            if cypher.get("statement") and cypher.get("records"):
+                recent_cyphers.append(cypher["statement"])
+
     print(f"\n🔄 Query mapper: Sending {len(tasks)} task(s) to text2cypher")
+    print(f"   Including {len(recent_cyphers)} recent successful Cypher queries for context")
     for i, task in enumerate(tasks):
         print(f"   Task {i+1}: {task.question}")
-    sends = [Send("text2cypher", {"task": task.question}) for task in tasks]
+
+    # Pass history and recent cyphers along with the task
+    sends = [
+        Send("text2cypher", {
+            "task": task.question,
+            "conversation_history": history,  # Pass full history
+            "recent_cyphers": recent_cyphers  # Pass recent successful queries
+        })
+        for task in tasks
+    ]
     return sends

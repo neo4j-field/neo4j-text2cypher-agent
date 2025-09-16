@@ -12,6 +12,9 @@ class CypherInputState(TypedDict):
     """Input state for Text2Cypher processing."""
     task: str  # The natural language query to process
     prev_steps: List[str]  # Previous processing steps taken
+    # Context fields for conversation history
+    conversation_history: Optional[List[Dict[str, Any]]]  # Full conversation history
+    recent_cyphers: Optional[List[str]]  # Recent successful Cypher queries
 
 
 class CypherState(TypedDict):
@@ -23,6 +26,9 @@ class CypherState(TypedDict):
     next_action_cypher: str
     attempts: int
     cypher_steps: Annotated[List[str], add]
+    # Context fields (needed for state propagation through the graph)
+    conversation_history: Optional[List[Dict[str, Any]]]
+    recent_cyphers: Optional[List[str]]
 
 
 class CypherOutputState(TypedDict):

@@ -80,9 +80,22 @@ def sidebar() -> None:
                 st.session_state["current_question"] = question
                 st.session_state["submit_new_question"] = True
 
+    # 2. Reset Chat (moved here after example questions)
+    # Show reset button if there are messages OR if a question is being processed
+    has_messages = len(st.session_state.get("messages", [])) > 0
+    has_pending_question = st.session_state.get("submit_new_question", False)
+
+    if has_messages or has_pending_question:
+        if st.sidebar.button("Reset Chat", type="primary"):
+            st.session_state["messages"] = []
+            if "current_question" in st.session_state:
+                del st.session_state["current_question"]
+            if "submit_new_question" in st.session_state:
+                del st.session_state["submit_new_question"]
+            st.rerun()
         st.sidebar.divider()
 
-    # 2. Query Processing Settings (controls that change behavior)
+    # 3. Query Processing Settings (controls that change behavior)
     # Only show if configured to be visible
     if st.session_state.get("show_query_processing", True):
         st.sidebar.markdown("## 🔧 Query Processing Settings")
@@ -243,16 +256,3 @@ def sidebar() -> None:
                 st.markdown(f"**Database:** {neo4j_database}")
                 st.markdown(f"**Status:** {connection_status}")
     
-    # Add some spacing before Reset Chat button
-    st.sidebar.write("")
-    st.sidebar.write("")
-    
-    # 4. Reset Chat (cleanup action at bottom)
-    if len(st.session_state.get("messages", list())) > 0:
-        if st.sidebar.button("Reset Chat", type="primary"):
-            st.session_state["messages"] = []
-            if "current_question" in st.session_state:
-                del st.session_state["current_question"]
-            if "submit_new_question" in st.session_state:
-                del st.session_state["submit_new_question"]
-            st.rerun()

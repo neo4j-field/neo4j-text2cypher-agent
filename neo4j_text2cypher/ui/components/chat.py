@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import hashlib
 
 import pandas as pd
@@ -14,7 +14,8 @@ FEEDBACK_REASON_OPTIONS = [
     "Invalid Cypher",
     "Incomplete Response",
     "Performance Issue",
-    "Misunderstood Question"
+    "Misunderstood Question",
+    "Other (please specify)"
 ]
 
 
@@ -433,10 +434,13 @@ async def append_llm_response(question: str) -> None:
                     with st.expander("Response", expanded=True):
                         # Show the answer text
                         st.markdown(response.get("answer", ""))
-                        
-                        # Add feedback widget for the current response
-                        render_feedback_widget(response)
-                        
+
+                        # Calculate the message index that this will have after being appended
+                        # This ensures the response_id is consistent between initial render and reruns
+                        current_message_count = len(st.session_state.get("messages", []))
+                        # Add feedback widget for the current response with the correct index
+                        render_feedback_widget(response, message_index=current_message_count)
+
                         # Show response details if there are cyphers
                         show_cypher_response_information(response=response, is_latest_response=True)
 
@@ -548,60 +552,116 @@ def display_chat_history() -> None:
                     
                     # Only show feedback widget for the latest message
                     if is_latest:
-                        render_feedback_widget(response_content)
+                        render_feedback_widget(response_content, message_index=i)
                     else:
                         # For historical messages, just show if feedback was submitted
-                        response_id = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
+                        answer_hash = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
+                        response_id = f"{answer_hash}_{i}"
                         if st.session_state.get(f"feedback_saved_{response_id}"):
                             st.markdown("---")
                             st.success("✅ Feedback submitted")
                     
                     show_cypher_response_information(response=response_content)
 
-def render_feedback_widget(response_content: dict) -> None:
+def render_feedback_widget(response_content: dict, message_index: Optional[int] = None) -> None:
     """
-    Renders the feedback widget for a response. 
+    Renders the feedback widget for a response.
     This is used in both append_llm_response and display_chat_history to avoid duplication.
+
+    Parameters
+    ----------
+    response_content : dict
+        The response content dictionary
+    message_index : Optional[int]
+        The index of the message in the chat history (for uniqueness)
     """
     st.markdown("---")
-    
-    # Use a unique ID for this response
-    response_id = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
-    
+
+    # Use a unique ID for this response that includes both content hash and position
+    # This prevents duplicate keys when the same answer appears multiple times
+    answer_hash = hashlib.md5(response_content.get("answer", "").encode()).hexdigest()[:8]
+
+    # If we have a message index, use it for uniqueness, otherwise use timestamp
+    if message_index is not None:
+        response_id = f"{answer_hash}_{message_index}"
+    else:
+        import time
+        response_id = f"{answer_hash}_{int(time.time() * 1000)}"
+
+    # Check if feedback has already been saved
     if st.session_state.get(f"feedback_saved_{response_id}"):
         st.success("✅ Feedback submitted")
     else:
         st.markdown("**Was this response helpful?**")
-        
-        # Store response in session state
+
+        # Store response in session state for later use
         if f"response_{response_id}" not in st.session_state:
             st.session_state[f"response_{response_id}"] = response_content
-        
+
         # Display feedback widget
+        feedback_key = f"feedback_{response_id}"
+
+        # Use st.feedback widget
         feedback_value = st.feedback(
-            "thumbs", 
-            key=f"feedback_{response_id}"
+            "thumbs",
+            key=feedback_key
         )
-        
-        # Check feedback value
-        if feedback_value == 1:
-            # Thumbs up - save immediately
-            _save_feedback_ui(response_content, "correct", None, response_id)
-            st.rerun()
-        elif feedback_value == 0:
-            # Thumbs down - show reason dropdown
+
+        # Process feedback inline (no callback, no rerun)
+        if feedback_value is not None:
+            # Check if we haven't already saved this feedback
+            if not st.session_state.get(f"feedback_saved_{response_id}"):
+                if feedback_value == 1:
+                    # Thumbs up - save immediately
+                    _save_feedback_ui(response_content, "correct", None, response_id)
+                    # Trigger a rerun to show success message
+                    st.rerun()
+                elif feedback_value == 0:
+                    # Thumbs down - mark to show reason dropdown
+                    st.session_state[f"show_reason_{response_id}"] = True
+
+        # Show reason dropdown if thumbs down was clicked
+        if st.session_state.get(f"show_reason_{response_id}"):
             st.markdown("**Please select a reason:**")
-            
+
             reason = st.selectbox(
                 "Feedback reason",
                 FEEDBACK_REASON_OPTIONS,
                 key=f"reason_select_{response_id}",
                 label_visibility="collapsed"
             )
-            
-            # Auto-submit when a reason is selected
-            if reason != "Select a reason...":
+
+            # Handle "Other" option with custom text input
+            if reason == "Other (please specify)":
+                custom_text = st.text_area(
+                    "Please describe the issue:",
+                    key=f"custom_reason_{response_id}",
+                    max_chars=500,
+                    height=100,
+                    placeholder="Enter your feedback here (max 500 characters)"
+                )
+
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    if st.button("Submit", key=f"submit_custom_{response_id}"):
+                        if custom_text and custom_text.strip():
+                            # Save the custom text as the reason
+                            _save_feedback_ui(response_content, "incorrect", custom_text.strip(), response_id)
+                            # Clean up session state
+                            if f"show_reason_{response_id}" in st.session_state:
+                                del st.session_state[f"show_reason_{response_id}"]
+                            if f"custom_reason_{response_id}" in st.session_state:
+                                del st.session_state[f"custom_reason_{response_id}"]
+                            st.rerun()
+                        else:
+                            st.warning("Please enter some feedback before submitting.")
+
+            # Auto-submit for predefined reasons (not "Select a reason..." or "Other")
+            elif reason != "Select a reason...":
                 _save_feedback_ui(response_content, "incorrect", reason, response_id)
+                # Clean up session state
+                if f"show_reason_{response_id}" in st.session_state:
+                    del st.session_state[f"show_reason_{response_id}"]
                 st.rerun()
 
 
@@ -616,7 +676,7 @@ def _save_feedback_ui(response_content: dict, validation: str, reason: str = Non
         cypher_stmt = response_content.get("cypher", {}).get("statement", "")
     response_text = response_content.get("answer", "")
     save_feedback(question, cypher_stmt, response_text, validation, reason)
-    # Store feedback status using the response_id 
+    # Store feedback status using the response_id
     if response_id:
         st.session_state[f"feedback_saved_{response_id}"] = True
 

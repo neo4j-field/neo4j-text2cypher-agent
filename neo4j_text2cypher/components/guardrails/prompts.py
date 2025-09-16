@@ -16,6 +16,10 @@ You must decide whether the provided question is in scope.
 Assume the question might be related.
 If you're absolutely sure it is NOT related, output "end".
 Provide only the specified output: "planner" or "end".
+
+IMPORTANT: When analyzing the current question, consider the conversation history if provided.
+Questions that may seem incomplete or out of context on their own could be follow-ups to previous questions.
+Use the conversation history to understand the full context before deciding if a question is out of scope.
 """
 
 
@@ -47,7 +51,7 @@ def create_guardrails_prompt_template(
         if graph is not None
         else ""
     )
-    message = scope_context + graph_context + "\nQuestion: {question}"
+    message = scope_context + graph_context + "\n\n{conversation_history}\n\nCurrent Question: {question}"
 
     return ChatPromptTemplate.from_messages(
         [

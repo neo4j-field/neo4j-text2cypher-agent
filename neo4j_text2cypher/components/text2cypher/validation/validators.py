@@ -77,6 +77,7 @@ async def validate_cypher_query_with_llm(
     question: str,
     graph: Neo4jGraph,
     cypher_statement: str,
+    conversation_history: List[Dict[str, Any]] = None,
 ) -> Dict[str, List[str]]:
     """
     Validate the Cypher statement with an LLM.
@@ -119,17 +120,38 @@ async def validate_cypher_query_with_llm(
         cleaned_schema_file.write_text(schema_for_validation)
         print(f"   📝 Cleaned schema written to: {cleaned_schema_file}")
 
+    # Format conversation context for validation
+    conversation_context = ""
+    if conversation_history:
+        recent_queries = []
+        for record in conversation_history[-5:]:  # Look at last 5 conversations (matching history size limit)
+            q = record.get("question", "")
+            # Get successful queries from this conversation
+            for cypher in record.get("cyphers", []):
+                if cypher.get("statement") and cypher.get("records"):
+                    recent_queries.append(f"Q: {q}\nCypher: {cypher['statement']}")
+                    break
+
+        if recent_queries:
+            conversation_context = "Recent conversation context:\n" + "\n".join(recent_queries)
+
+    if not conversation_context:
+        conversation_context = "No recent conversation history."
+
     # Debug: Print validation prompt details
     print(f"\n🔍 Validation Prompt Details:")
     print(f"   Question: {question}")
     print(f"   Cypher to validate: {cypher_statement}")
     print(f"   Schema length: {len(schema_for_validation)} characters")
+    if conversation_history:
+        print(f"   Context provided: Yes ({len(conversation_history)} previous queries)")
 
     llm_output: ValidateCypherOutput = await validate_cypher_chain.ainvoke(
         {
             "question": question,
             "schema": schema_for_validation,
             "cypher": cypher_statement,
+            "conversation_context": conversation_context,
         }
     )
 

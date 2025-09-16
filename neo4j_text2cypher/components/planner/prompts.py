@@ -63,19 +63,23 @@ def create_passthrough_prompt_template() -> ChatPromptTemplate:
         The prompt template for reference resolution in passthrough mode.
     """
     passthrough_system = """
-You are a query processor that clarifies questions using conversation history.
-Your job is to take the user's question and resolve any ambiguous references using the conversation history provided.
+You are a query processor in passthrough mode.
+Your job is to take the user's question and pass it through UNCHANGED.
 
 IMPORTANT RULES:
-1. You must return exactly ONE task with the clarified question
-2. If the question has no ambiguous references, return it unchanged
-3. If it contains references (like "those", "them", "it", "that", "their", "these") that can be resolved from conversation history, replace them with specific terms
-4. The task's parent_task should always be the original question
+1. You must return exactly ONE task with the ORIGINAL question exactly as provided
+2. DO NOT modify the question in any way
+3. DO NOT resolve references like "those", "them", "it", "that", "their", "these", "which"
+4. DO NOT add context from conversation history to the question
+5. The task's question and parent_task should both be the original unmodified question
+
+The generation node will handle reference resolution with full schema context.
+Your only job is to pass the question through unchanged.
 
 Example:
 - Conversation history: "Q: Show me all customers from California  A: [list of California customers]"
 - Current question: "What are their orders?"
-- Output: Single task with question "What are the orders for customers from California?"
+- Output: Single task with question "What are their orders?" (UNCHANGED)
 """
 
     message = """{conversation_history}

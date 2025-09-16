@@ -81,11 +81,13 @@ def create_text2cypher_validation_node(
         corrected_cypher = state.get("statement", "")
 
         # Use LLM to find additional potential errors and get the mapping for values
+        # Pass conversation history for context-aware validation
         llm_errors = await validate_cypher_query_with_llm(
             validate_cypher_chain=validate_cypher_chain,
             question=state.get("task", ""),
             graph=graph,
             cypher_statement=state.get("statement", ""),
+            conversation_history=state.get("conversation_history", []),
         )
         errors.extend(llm_errors.get("errors", []))
         mapping_errors.extend(llm_errors.get("mapping_errors", []))
